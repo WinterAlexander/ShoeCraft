@@ -1,10 +1,10 @@
-use crate::decal::{Decal, Decalable, spray_decal};
 use crate::drawing::Pencil;
 use avian3d::PhysicsPlugins;
-use avian3d::prelude::{ColliderConstructor, ColliderConstructorHierarchy, RigidBody};
+use avian3d::prelude::{ColliderConstructor, ColliderConstructorHierarchy};
 use bevy::anti_alias::taa::TemporalAntiAliasing;
 use bevy::camera::Hdr;
 use bevy::core_pipeline::Skybox;
+use bevy::core_pipeline::prepass::DepthPrepass;
 use bevy::image::CompressedImageFormats;
 use bevy::light::{CascadeShadowConfigBuilder, DirectionalLightShadowMap};
 use bevy::pbr::{ScreenSpaceAmbientOcclusion, ScreenSpaceAmbientOcclusionQualityLevel};
@@ -78,6 +78,7 @@ fn setup_shop(
     commands.spawn((
         //NormalPrepass,
         //ShowPrepass::Normals,
+        DepthPrepass,
         Camera3d::default(),
         Camera {
             // renders after / on top of the main camera
@@ -197,14 +198,14 @@ fn prepare_scene_children(
         if let Ok(name) = names.get(child) {
             match name.as_str() {
                 "Pencil" => {
-                    commands.entity(child).insert(Pencil);
+                    commands.entity(child).insert(Pencil::default());
                 }
                 _ => {
                     if name.contains("Pencil") {
                         // Pencil's materials
                         continue;
                     }
-                    commands.entity(child).insert(Decalable::default());
+                    //commands.entity(child).insert(Decalable::default());
                 }
             }
         }

@@ -1,6 +1,5 @@
 mod debug;
 mod debug_camera_controller;
-mod decal;
 mod drawing;
 mod particle;
 mod pause;
@@ -11,7 +10,6 @@ mod window_management;
 
 use crate::debug::DebugPlugin;
 use crate::debug_camera_controller::DebugCameraControllerPlugin;
-use crate::decal::DecalPlugin;
 use crate::drawing::DrawingPlugin;
 use crate::pause::PausePlugin;
 use crate::scene_loader::SceneLoaderPlugin;
@@ -70,7 +68,7 @@ fn main() {
             }),
     );
     app.add_plugins(InteractiveButtonPlugin);
-    app.add_plugins((SceneLoaderPlugin, TitleScreenPlugin, DecalPlugin));
+    app.add_plugins((SceneLoaderPlugin, TitleScreenPlugin));
     app.add_plugins(DebugCameraControllerPlugin);
     app.add_plugins(DrawingPlugin);
     app.add_plugins((
