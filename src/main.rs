@@ -2,7 +2,7 @@ mod character;
 pub mod debug;
 mod debug_camera_controller;
 pub mod decal;
-mod example2d;
+mod drawing;
 mod object_spawner;
 mod particle;
 pub mod pause;
@@ -12,16 +12,13 @@ mod title_screen;
 mod ui;
 mod window_management;
 
-use crate::character::CharacterPlugin;
 use crate::debug::DebugPlugin;
 use crate::debug_camera_controller::DebugCameraControllerPlugin;
 use crate::decal::DecalPlugin;
-use crate::example2d::example2d::Example2DPlugin;
-use crate::example2d::topdowncameracontroller::TopDownCameraControllerPlugin;
+use crate::drawing::DrawingPlugin;
 use crate::object_spawner::ObjectSpawnerPlugin;
 use crate::pause::PausePlugin;
 use crate::scene_loader::SceneLoaderPlugin;
-use crate::thirdperson_camera_controller::ThirdPersonCameraPlugin;
 use crate::title_screen::{GameState, TitleScreenPlugin};
 use crate::ui::interactive_button::InteractiveButtonPlugin;
 use crate::window_management::WindowManagementPlugin;
@@ -33,15 +30,10 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{AddressMode, FilterMode};
 use bevy::window::{CursorGrabMode, CursorOptions};
 use bevy_show_prepass::ShowPrepassPlugin;
-use std::env;
 
-fn make_2d(app: &mut App) {
-    app.add_plugins(DefaultPlugins)
-        .add_plugins(Example2DPlugin)
-        .add_plugins(TopDownCameraControllerPlugin);
-}
+fn main() {
+    let mut app = App::new();
 
-fn make_3d(app: &mut App) {
     let default_sampler = ImageSamplerDescriptor {
         address_mode_u: ImageAddressMode::from(AddressMode::Repeat),
         address_mode_v: ImageAddressMode::from(AddressMode::Repeat),
@@ -82,7 +74,7 @@ fn make_3d(app: &mut App) {
     app.add_plugins(InteractiveButtonPlugin);
     app.add_plugins((SceneLoaderPlugin, TitleScreenPlugin, DecalPlugin));
     app.add_plugins(DebugCameraControllerPlugin);
-    app.add_plugins(ObjectSpawnerPlugin);
+    app.add_plugins(DrawingPlugin);
     app.add_plugins((
         DebugPlugin,
         WindowManagementPlugin,
@@ -90,18 +82,6 @@ fn make_3d(app: &mut App) {
         ShowPrepassPlugin,
     ));
     app.insert_state(GameState::TitleScreen);
-}
-
-fn main() {
-    let mut app = App::new();
-
-    let args: Vec<String> = env::args().collect();
-
-    if args.contains(&String::from("2d")) {
-        make_2d(&mut app);
-    } else {
-        make_3d(&mut app);
-    }
 
     app.run();
 }

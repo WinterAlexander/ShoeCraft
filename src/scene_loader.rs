@@ -29,7 +29,7 @@ pub struct SceneElement;
 impl Plugin for SceneLoaderPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_shop);
-        app.add_systems(Update, (asset_loaded, make_all_decalable, painter));
+        app.add_systems(Update, asset_loaded);
         app.add_plugins(PhysicsPlugins::default())
             .insert_resource(ClearColor(Color::srgb(0.3, 0.6, 0.9)))
             .insert_resource(DirectionalLightShadowMap { size: 4096 });
@@ -119,39 +119,6 @@ fn setup_shop(mut commands: Commands, mut assets: ResMut<AssetServer>) {
         ColliderConstructorHierarchy::new(ColliderConstructor::TrimeshFromMesh),
         SceneElement,
     ));
-}
-
-fn painter(
-    mut commands: Commands,
-    btn: Res<ButtonInput<MouseButton>>,
-    mut standard_materials: ResMut<Assets<StandardMaterial>>,
-    assets: Res<AssetServer>,
-    player: Query<&Transform, With<Camera3d>>,
-) {
-    let spray_material = standard_materials.add(StandardMaterial {
-        base_color: Color::srgb(0.1, 0.1, 0.1),
-        base_color_texture: Some(assets.load("pencil_mark.png").clone()),
-        alpha_mode: AlphaMode::Mask(0.5),
-        ..default()
-    });
-
-    if btn.just_pressed(MouseButton::Left) {
-        for transform in player.iter() {
-            let spray_transform = transform.with_scale(Vec3::ONE * 0.02 + Vec3::Z * 50.0);
-
-            spray_decal(&mut commands, spray_material.clone(), spray_transform);
-        }
-    }
-}
-
-fn make_all_decalable(
-    // Make absolutely everything decalable, just for demonstration purposes
-    mut commands: Commands,
-    entities: Query<Entity, (With<Mesh3d>, Without<Decal>, Without<Decalable>)>,
-) {
-    for entity in entities.iter() {
-        commands.entity(entity).insert(Decalable::default());
-    }
 }
 
 fn asset_loaded(
