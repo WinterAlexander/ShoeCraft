@@ -1,30 +1,34 @@
 use crate::decal::{Decal, Decalable, spray_decal};
 use crate::title_screen::GameState;
 use avian3d::parry::glamx::Vec3;
+use avian3d::prelude::{SpatialQuery, SpatialQueryFilter};
 use bevy::app::{App, Plugin, Startup, Update};
 use bevy::asset::{AssetServer, Assets, Handle};
-use bevy::camera::{Camera, Camera3d};
+use bevy::camera::Camera;
 use bevy::color::Color;
 use bevy::input::ButtonInput;
 use bevy::material::AlphaMode;
-use bevy::math::Quat;
 use bevy::mesh::Mesh3d;
 use bevy::pbr::StandardMaterial;
 use bevy::prelude::{
-    Commands, Entity, GlobalTransform, IntoScheduleConfigs, MouseButton, Query, Res, ResMut,
-    Resource, Single, Touches, Transform, Window, With, Without, default, in_state,
+    Children, Commands, Component, Entity, GlobalTransform, IntoScheduleConfigs, MouseButton,
+    Query, Res, ResMut, Resource, Single, Touches, Transform, Window, With, Without, default,
+    in_state,
 };
 use bevy::window::PrimaryWindow;
 use std::f32::consts::PI;
 
 pub struct DrawingPlugin;
 
+#[derive(Component)]
+pub struct Pencil;
+
 impl Plugin for DrawingPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, init_spray_material);
         app.add_systems(
             Update,
-            (make_all_decalable, draw).run_if(in_state(GameState::Drawing)),
+            (draw, move_pencil).run_if(in_state(GameState::Drawing)),
         );
     }
 }
@@ -49,13 +53,42 @@ fn init_spray_material(
     })
 }
 
-fn make_all_decalable(
-    mut commands: Commands,
-    entities: Query<Entity, (With<Mesh3d>, Without<Decal>, Without<Decalable>)>,
+fn move_pencil(
+    mut pencil: Single<(Entity, &mut Transform), With<Pencil>>,
+    touches: Res<Touches>,
+    window_query: Single<&Window, With<PrimaryWindow>>,
+    camera_query: Single<(&Camera, &GlobalTransform)>,
+    spatial_query: SpatialQuery,
+    children: Query<&Children>,
 ) {
-    for entity in entities.iter() {
-        commands.entity(entity).insert(Decalable::default());
-    }
+    let position = if let Some(touch) = touches.iter().next() {
+        touch.position()
+    } else if let Some(cursor_pos) = window_query.cursor_position() {
+        cursor_pos
+    } else {
+        return;
+    };
+    let Ok(ray) = camera_query.0.viewport_to_world(&camera_query.1, position) else {
+        return;
+    };
+
+    let Some(hit) = spatial_query.cast_ray_predicate(
+        ray.origin,
+        ray.direction,
+        50.0,
+        false,
+        &SpatialQueryFilter::default(),
+        &|entity| {
+            // If entity is pencil itself or a descendant of pencil, skip
+            entity != pencil.0 && !children.iter_descendants(pencil.0).any(|e| e == entity)
+        },
+    ) else {
+        return;
+    };
+
+    let hit_point = ray.origin + ray.direction * hit.distance;
+
+    pencil.1.translation = hit_point;
 }
 
 fn draw(

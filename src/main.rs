@@ -2,7 +2,6 @@ mod debug;
 mod debug_camera_controller;
 mod decal;
 mod drawing;
-mod object_spawner;
 mod particle;
 mod pause;
 mod scene_loader;
@@ -26,6 +25,8 @@ use bevy::image::{ImageAddressMode, ImageFilterMode, ImageSamplerDescriptor};
 use bevy::prelude::*;
 use bevy::render::render_resource::{AddressMode, FilterMode};
 use bevy::window::{CursorGrabMode, CursorOptions};
+use bevy_inspector_egui::bevy_egui::EguiPlugin;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_show_prepass::ShowPrepassPlugin;
 
 fn main() {
@@ -77,6 +78,8 @@ fn main() {
         WindowManagementPlugin,
         PausePlugin,
         ShowPrepassPlugin,
+        EguiPlugin::default(),
+        WorldInspectorPlugin::new(),
     ));
     app.insert_state(GameState::TitleScreen);
 

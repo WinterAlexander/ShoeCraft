@@ -1,4 +1,5 @@
 use crate::decal::{Decal, Decalable, spray_decal};
+use crate::drawing::Pencil;
 use avian3d::PhysicsPlugins;
 use avian3d::prelude::{ColliderConstructor, ColliderConstructorHierarchy, RigidBody};
 use bevy::anti_alias::taa::TemporalAntiAliasing;
@@ -11,6 +12,7 @@ use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use bevy::render::camera::TemporalJitter;
 use bevy::render::render_resource::{TextureViewDescriptor, TextureViewDimension};
+use bevy::world_serialization::WorldInstanceReady;
 
 pub struct SceneLoaderPlugin;
 
@@ -22,9 +24,6 @@ pub struct Cubemap {
     pub(crate) is_loaded: bool,
     pub(crate) image_handle: Handle<Image>,
 }
-
-#[derive(Component)]
-pub struct SceneElement;
 
 impl Plugin for SceneLoaderPlugin {
     fn build(&self, app: &mut App) {
@@ -38,7 +37,6 @@ impl Plugin for SceneLoaderPlugin {
 
 fn setup_shop(mut commands: Commands, mut assets: ResMut<AssetServer>) {
     commands.spawn((
-        SceneElement,
         AudioPlayer::new(assets.load("test_song.ogg")),
         PlaybackSettings::LOOP,
     ));
@@ -49,7 +47,6 @@ fn setup_shop(mut commands: Commands, mut assets: ResMut<AssetServer>) {
         affects_lightmapped_meshes: true,
     });
     commands.spawn((
-        SceneElement,
         DirectionalLight {
             color: Color::WHITE,
             illuminance: 5000.0,
@@ -73,7 +70,6 @@ fn setup_shop(mut commands: Commands, mut assets: ResMut<AssetServer>) {
     });
 
     commands.spawn((
-        SceneElement,
         //NormalPrepass,
         //ShowPrepass::Normals,
         Camera3d::default(),
@@ -113,12 +109,35 @@ fn setup_shop(mut commands: Commands, mut assets: ResMut<AssetServer>) {
         Bloom::default(),
     ));
 
-    commands.spawn((
-        WorldAssetRoot(assets.load("shop.glb#Scene0")),
-        RigidBody::Static,
-        ColliderConstructorHierarchy::new(ColliderConstructor::TrimeshFromMesh),
-        SceneElement,
-    ));
+    commands
+        .spawn((
+            WorldAssetRoot(assets.load("shop.glb#Scene0")),
+            ColliderConstructorHierarchy::new(ColliderConstructor::ConvexDecompositionFromMesh),
+        ))
+        .observe(prepare_scene_children);
+}
+
+fn prepare_scene_children(
+    ready: On<WorldInstanceReady>,
+    mut commands: Commands,
+    children: Query<&Children>,
+    names: Query<&Name>,
+) {
+    for child in children.iter_descendants(ready.entity) {
+        if let Ok(name) = names.get(child) {
+            if name.contains("Material") {
+                continue;
+            }
+            match name.as_str() {
+                "Pencil" => {
+                    commands.entity(child).insert(Pencil);
+                }
+                _ => {
+                    commands.entity(child).insert(Decalable::default());
+                }
+            }
+        }
+    }
 }
 
 fn asset_loaded(
