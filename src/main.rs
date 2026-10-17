@@ -32,6 +32,7 @@ use bevy::image::{ImageAddressMode, ImageFilterMode, ImageSamplerDescriptor};
 use bevy::prelude::*;
 use bevy::render::render_resource::{AddressMode, FilterMode};
 use bevy::window::{CursorGrabMode, CursorOptions};
+use bevy_show_prepass::ShowPrepassPlugin;
 use std::env;
 
 fn make_2d(app: &mut App) {
@@ -79,10 +80,15 @@ fn make_3d(app: &mut App) {
             }),
     );
     app.add_plugins(InteractiveButtonPlugin);
-    app.add_plugins((TitleScreenPlugin, DecalPlugin));
+    app.add_plugins((SceneLoaderPlugin, TitleScreenPlugin, DecalPlugin));
     app.add_plugins(DebugCameraControllerPlugin);
     app.add_plugins(ObjectSpawnerPlugin);
-    app.add_plugins((DebugPlugin, WindowManagementPlugin, PausePlugin));
+    app.add_plugins((
+        DebugPlugin,
+        WindowManagementPlugin,
+        PausePlugin,
+        ShowPrepassPlugin,
+    ));
     app.insert_state(GameState::TitleScreen);
 }
 

@@ -5,8 +5,8 @@ use bevy::render::mesh::Indices;
 use bevy::render::mesh::VertexAttributeValues;
 use bevy::render::render_resource::PrimitiveTopology;
 
-const DECAL_REMOVE_BACKFACES: bool = true; // When false, both sides of the mesh will be sprayed with a decal
-const DECAL_MAX_PER_ENTTIY: usize = 16; // Max number of decals you can stick on one entity
+const DECAL_REMOVE_BACKFACES: bool = false; // When false, both sides of the mesh will be sprayed with a decal
+const DECAL_MAX_PER_ENTTIY: usize = 64; // Max number of decals you can stick on one entity
 const DECAL_EPSILON: f32 = 0.00016; // The offset of the decal from the base mesh, to prevent Z-fighting
 
 /// Decalable component. Add this to entities that you wish to apply decals onto.
@@ -40,8 +40,8 @@ pub struct Decalable(usize); // Stores the number of decals already applied
 /// The bounding box of the Decals transform must intersect
 /// with the vertices of the model it's being applied to, in
 /// world space. Decals will only be applied to entities
-/// with the Decalable component. This function will try to
-/// spray a decal only once after called.
+/// with the Decalable component. The decal is applied once, once at least one
+/// decalable model exists, and is then removed from the world.
 pub fn spray_decal(
     commands: &mut Commands,
     material: Handle<StandardMaterial>,
@@ -106,7 +106,7 @@ fn new_triangle(
     let d_ac = (1. - fa) / (fc - fa);
     let ab = a.lerp(b, d_ab);
     let ac = a.lerp(c, d_ac);
-    triangles.push(Triangle { a: a, b: ab, c: ac });
+    triangles.push(Triangle { a, b: ab, c: ac });
 }
 
 // Create two new triangles between b, c, ab, ac
@@ -345,23 +345,25 @@ fn decal_system(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut decals: Query<(Entity, &Transform, &ApplyingDecal)>,
-    mut models: Query<(
-        Entity,
-        &Mesh3d,
-        &Transform,
-        &GlobalTransform,
-        &mut Decalable,
-    )>,
+    mut models: Query<(Entity, &Mesh3d, &GlobalTransform, &mut Decalable)>,
 ) {
+    // A decal may be sprayed before the scene assets have finished loading.
+    // Keep it around until there is at least one model it can be applied to.
+    if models.is_empty() {
+        return;
+    }
+
     for (decal_entity, transform, decal) in decals.iter_mut() {
-        for (model_entity, model_mesh, model_transform, global_transform, mut decalable) in
-            models.iter_mut()
-        {
+        for (model_entity, model_mesh, global_transform, mut decalable) in models.iter_mut() {
             if decalable.0 >= DECAL_MAX_PER_ENTTIY {
                 continue;
             }
 
-            let mesh_transform = Transform::from(global_transform.mul_transform(*model_transform));
+            // `GlobalTransform` on its own is what maps mesh vertices to world
+            // space. Composing the entity's local `Transform` on top of it as
+            // well (`global.mul_transform(local)`) would apply the node's
+            // transform twice and project decals in a scaled/rotated space.
+            let mesh_transform = Transform::from(*global_transform);
 
             if let Some(mesh) = apply_decal(
                 meshes.get(model_mesh).unwrap(),

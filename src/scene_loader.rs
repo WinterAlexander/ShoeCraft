@@ -1,9 +1,7 @@
-use crate::decal::spray_decal;
+use crate::decal::{Decal, Decalable, spray_decal};
 use avian3d::PhysicsPlugins;
-use avian3d::prelude::{
-    ColliderConstructor, ColliderConstructorHierarchy, PhysicsDebugPlugin, RigidBody,
-};
-use bevy::anti_alias::taa::{TemporalAntiAliasPlugin, TemporalAntiAliasing};
+use avian3d::prelude::{ColliderConstructor, ColliderConstructorHierarchy, RigidBody};
+use bevy::anti_alias::taa::TemporalAntiAliasing;
 use bevy::camera::Hdr;
 use bevy::core_pipeline::Skybox;
 use bevy::image::CompressedImageFormats;
@@ -31,25 +29,14 @@ pub struct SceneElement;
 impl Plugin for SceneLoaderPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_shop);
-        app.add_systems(Update, asset_loaded);
+        app.add_systems(Update, (asset_loaded, make_all_decalable, painter));
         app.add_plugins(PhysicsPlugins::default())
             .insert_resource(ClearColor(Color::srgb(0.3, 0.6, 0.9)))
             .insert_resource(DirectionalLightShadowMap { size: 4096 });
     }
 }
 
-fn setup_shop(
-    mut commands: Commands,
-    mut assets: ResMut<AssetServer>,
-    mut standard_materials: ResMut<Assets<StandardMaterial>>,
-) {
-    let spray_material = standard_materials.add(StandardMaterial {
-        base_color: Color::srgb(1.0, 0.0, 0.0),
-        base_color_texture: Some(assets.load("splatter1.png").clone()),
-        alpha_mode: AlphaMode::Mask(0.5),
-        ..default()
-    });
-
+fn setup_shop(mut commands: Commands, mut assets: ResMut<AssetServer>) {
     commands.spawn((
         SceneElement,
         AudioPlayer::new(assets.load("test_song.ogg")),
@@ -87,6 +74,8 @@ fn setup_shop(
 
     commands.spawn((
         SceneElement,
+        //NormalPrepass,
+        //ShowPrepass::Normals,
         Camera3d::default(),
         Camera {
             // renders after / on top of the main camera
@@ -130,14 +119,39 @@ fn setup_shop(
         ColliderConstructorHierarchy::new(ColliderConstructor::TrimeshFromMesh),
         SceneElement,
     ));
+}
 
-    // Spray transform. In this case spraying straight down, scaled by 2 and reaching 12 meters down
-    let spray_transform = Transform::from_translation(Vec3::Y)
-        .with_scale(Vec3::ONE * 2. + Vec3::Z * 10.)
-        .looking_to(Vec3::NEG_Y, Vec3::Y);
+fn painter(
+    mut commands: Commands,
+    btn: Res<ButtonInput<MouseButton>>,
+    mut standard_materials: ResMut<Assets<StandardMaterial>>,
+    assets: Res<AssetServer>,
+    player: Query<&Transform, With<Camera3d>>,
+) {
+    let spray_material = standard_materials.add(StandardMaterial {
+        base_color: Color::srgb(0.1, 0.1, 0.1),
+        base_color_texture: Some(assets.load("pencil_mark.png").clone()),
+        alpha_mode: AlphaMode::Mask(0.5),
+        ..default()
+    });
 
-    // Finally spray the decal, which will be applied next frame
-    spray_decal(&mut commands, spray_material.clone(), spray_transform);
+    if btn.just_pressed(MouseButton::Left) {
+        for transform in player.iter() {
+            let spray_transform = transform.with_scale(Vec3::ONE * 0.02 + Vec3::Z * 50.0);
+
+            spray_decal(&mut commands, spray_material.clone(), spray_transform);
+        }
+    }
+}
+
+fn make_all_decalable(
+    // Make absolutely everything decalable, just for demonstration purposes
+    mut commands: Commands,
+    entities: Query<Entity, (With<Mesh3d>, Without<Decal>, Without<Decalable>)>,
+) {
+    for entity in entities.iter() {
+        commands.entity(entity).insert(Decalable::default());
+    }
 }
 
 fn asset_loaded(
