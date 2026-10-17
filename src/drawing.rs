@@ -8,6 +8,7 @@ use bevy::camera::Camera;
 use bevy::color::Color;
 use bevy::input::ButtonInput;
 use bevy::material::AlphaMode;
+use bevy::math::Quat;
 use bevy::mesh::Mesh3d;
 use bevy::pbr::StandardMaterial;
 use bevy::prelude::{
@@ -89,6 +90,7 @@ fn move_pencil(
     let hit_point = ray.origin + ray.direction * hit.distance;
 
     pencil.1.translation = hit_point;
+    pencil.1.rotation = Quat::from_axis_angle(Vec3::Z, PI * 5.0 / 4.0);
 }
 
 fn draw(

@@ -125,14 +125,15 @@ fn prepare_scene_children(
 ) {
     for child in children.iter_descendants(ready.entity) {
         if let Ok(name) = names.get(child) {
-            if name.contains("Material") {
-                continue;
-            }
             match name.as_str() {
                 "Pencil" => {
                     commands.entity(child).insert(Pencil);
                 }
                 _ => {
+                    if name.contains("Pencil") {
+                        // Pencil's materials
+                        continue;
+                    }
                     commands.entity(child).insert(Decalable::default());
                 }
             }

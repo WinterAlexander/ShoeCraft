@@ -6,7 +6,7 @@ use bevy::render::mesh::VertexAttributeValues;
 use bevy::render::render_resource::PrimitiveTopology;
 
 const DECAL_REMOVE_BACKFACES: bool = true; // When false, both sides of the mesh will be sprayed with a decal
-const DECAL_EPSILON: f32 = 0.00016; // The offset of the decal from the base mesh, to prevent Z-fighting
+const DECAL_EPSILON: f32 = 0.00003; // The offset of the decal from the base mesh, to prevent Z-fighting
 
 /// Decalable component. Add this to entities that you wish to apply decals onto.
 ///
