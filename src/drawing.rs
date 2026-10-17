@@ -1,7 +1,8 @@
 use crate::decal::{Decal, Decalable, spray_decal};
+use crate::title_screen::GameState;
 use avian3d::parry::glamx::Vec3;
-use bevy::app::{App, Plugin, Update};
-use bevy::asset::{AssetServer, Assets};
+use bevy::app::{App, Plugin, Startup, Update};
+use bevy::asset::{AssetServer, Assets, Handle};
 use bevy::camera::{Camera, Camera3d};
 use bevy::color::Color;
 use bevy::input::ButtonInput;
@@ -10,8 +11,8 @@ use bevy::math::Quat;
 use bevy::mesh::Mesh3d;
 use bevy::pbr::StandardMaterial;
 use bevy::prelude::{
-    Commands, Entity, GlobalTransform, MouseButton, Query, Res, ResMut, Single, Touches, Transform,
-    Window, With, Without, default,
+    Commands, Entity, GlobalTransform, IntoScheduleConfigs, MouseButton, Query, Res, ResMut,
+    Resource, Single, Touches, Transform, Window, With, Without, default, in_state,
 };
 use bevy::window::PrimaryWindow;
 use std::f32::consts::PI;
@@ -20,8 +21,32 @@ pub struct DrawingPlugin;
 
 impl Plugin for DrawingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (make_all_decalable, draw));
+        app.add_systems(Startup, init_spray_material);
+        app.add_systems(
+            Update,
+            (make_all_decalable, draw).run_if(in_state(GameState::Drawing)),
+        );
     }
+}
+
+#[derive(Resource)]
+pub struct SprayMaterial {
+    material: Handle<StandardMaterial>,
+}
+
+fn init_spray_material(
+    mut commands: Commands,
+    assets: Res<AssetServer>,
+    mut standard_materials: ResMut<Assets<StandardMaterial>>,
+) {
+    commands.insert_resource(SprayMaterial {
+        material: standard_materials.add(StandardMaterial {
+            base_color: Color::srgb(0.1, 0.1, 0.1),
+            base_color_texture: Some(assets.load("pencil_mark.png").clone()),
+            alpha_mode: AlphaMode::Mask(0.5),
+            ..default()
+        }),
+    })
 }
 
 fn make_all_decalable(
@@ -39,8 +64,7 @@ fn draw(
     touches: Res<Touches>,
     window_query: Single<&Window, With<PrimaryWindow>>,
     camera_query: Single<(&Camera, &GlobalTransform)>,
-    mut standard_materials: ResMut<Assets<StandardMaterial>>,
-    assets: Res<AssetServer>,
+    spray_material: Res<SprayMaterial>,
 ) {
     if buttons.pressed(MouseButton::Left) {
         let position = if let Some(touch) = touches.iter().next() {
@@ -57,13 +81,11 @@ fn draw(
                 .with_scale(Vec3::ONE * 0.01 + Vec3::Z * 50.0);
             spray_transform.rotate_local_z(rand::random::<f32>() * PI * 2.0);
 
-            let spray_material = standard_materials.add(StandardMaterial {
-                base_color: Color::srgb(0.1, 0.1, 0.1),
-                base_color_texture: Some(assets.load("pencil_mark.png").clone()),
-                alpha_mode: AlphaMode::Mask(0.5),
-                ..default()
-            });
-            spray_decal(&mut commands, spray_material.clone(), spray_transform);
+            spray_decal(
+                &mut commands,
+                spray_material.material.clone(),
+                spray_transform,
+            );
         }
     }
 }

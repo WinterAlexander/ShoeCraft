@@ -14,7 +14,7 @@ pub struct TitleScreenUI;
 pub enum GameState {
     #[default]
     TitleScreen,
-    Game,
+    Drawing,
     Paused,
 }
 
@@ -139,13 +139,13 @@ fn start_game_click_handler(
         };
 
         if *interaction == Interaction::Pressed {
-            next_state.set(GameState::Game);
+            next_state.set(GameState::Drawing);
         }
     }
 
     for gamepad in &gamepads {
         if gamepad.pressed(GamepadButton::Start) {
-            next_state.set(GameState::Game);
+            next_state.set(GameState::Drawing);
         }
     }
 }

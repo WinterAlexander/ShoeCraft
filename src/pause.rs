@@ -19,8 +19,8 @@ fn toggle_pause(
 ) {
     if input.just_pressed(KeyCode::Escape) {
         match current_state.get() {
-            GameState::Game => next_state.set(GameState::Paused),
-            GameState::Paused => next_state.set(GameState::Game),
+            GameState::Drawing => next_state.set(GameState::Paused),
+            GameState::Paused => next_state.set(GameState::Drawing),
             _ => {}
         }
     }
@@ -30,7 +30,7 @@ fn pause_physics(state: Res<State<GameState>>, mut physics_time: ResMut<Time<Phy
     if state.is_changed() {
         match state.get() {
             GameState::Paused => physics_time.pause(),
-            GameState::Game => physics_time.unpause(),
+            GameState::Drawing => physics_time.unpause(),
             _ => {}
         }
     }

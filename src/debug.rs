@@ -1,5 +1,4 @@
 use crate::debug_camera_controller::DebugCameraControllerState;
-use crate::thirdperson_camera_controller::ThirdPersonCameraControllerState;
 use avian3d::debug_render::PhysicsGizmos;
 use avian3d::prelude::PhysicsDebugPlugin;
 use bevy::app::{App, Plugin, Startup, Update};
@@ -22,13 +21,11 @@ fn toggle_debug_renderer(
     input: Res<ButtonInput<KeyCode>>,
     mut store: ResMut<GizmoConfigStore>,
     mut debug_camera_state: ResMut<DebugCameraControllerState>,
-    //mut thirdp_camera_controller_state: ResMut<ThirdPersonCameraControllerState>,
 ) {
     if input.just_pressed(KeyCode::F12) {
         let (config, _) = store.config_mut::<PhysicsGizmos>();
         config.enabled = !config.enabled;
     } else if input.just_pressed(KeyCode::F5) {
         debug_camera_state.enabled = !debug_camera_state.enabled;
-        //thirdp_camera_controller_state.enabled = !debug_camera_state.enabled;
     }
 }
