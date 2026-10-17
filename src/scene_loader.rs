@@ -13,6 +13,7 @@ use bevy::prelude::*;
 use bevy::render::camera::TemporalJitter;
 use bevy::render::render_resource::{TextureViewDescriptor, TextureViewDimension};
 use bevy::world_serialization::WorldInstanceReady;
+use std::f32::consts::PI;
 
 pub struct SceneLoaderPlugin;
 
@@ -28,14 +29,18 @@ pub struct Cubemap {
 impl Plugin for SceneLoaderPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_shop);
-        app.add_systems(Update, asset_loaded);
+        app.add_systems(Update, (asset_loaded, animation_transition));
         app.add_plugins(PhysicsPlugins::default())
             .insert_resource(ClearColor(Color::srgb(0.3, 0.6, 0.9)))
             .insert_resource(DirectionalLightShadowMap { size: 4096 });
     }
 }
 
-fn setup_shop(mut commands: Commands, mut assets: ResMut<AssetServer>) {
+fn setup_shop(
+    mut commands: Commands,
+    mut assets: ResMut<AssetServer>,
+    mut graphs: ResMut<Assets<AnimationGraph>>,
+) {
     commands.spawn((
         AudioPlayer::new(assets.load("test_song.ogg")),
         PlaybackSettings::LOOP,
@@ -47,6 +52,7 @@ fn setup_shop(mut commands: Commands, mut assets: ResMut<AssetServer>) {
         affects_lightmapped_meshes: true,
     });
     commands.spawn((
+        Transform::from_translation(Vec3::Y).looking_at(Vec3::ZERO, Vec3::Y),
         DirectionalLight {
             color: Color::WHITE,
             illuminance: 5000.0,
@@ -85,7 +91,7 @@ fn setup_shop(mut commands: Commands, mut assets: ResMut<AssetServer>) {
             fov: 55.0f32.to_radians(),
             ..default()
         }),
-        Transform::from_xyz(-1.0, 1.0, -0.75).looking_to(Vec3::NEG_Y, Vec3::Y),
+        Transform::from_xyz(-1.5, 1.0, -0.75).looking_at(Vec3::new(-1.3, 0.0, -0.75), Vec3::Y),
         Skybox {
             image: Some(skybox_handle.clone()),
             brightness: 1000.0,
@@ -115,6 +121,70 @@ fn setup_shop(mut commands: Commands, mut assets: ResMut<AssetServer>) {
             ColliderConstructorHierarchy::new(ColliderConstructor::ConvexDecompositionFromMesh),
         ))
         .observe(prepare_scene_children);
+
+    let mut graph = AnimationGraph::new();
+
+    let idle = graph.add_clip(
+        assets.load(GltfAssetLabel::Animation(0).from_asset("cat.glb")),
+        1.0,
+        graph.root,
+    );
+
+    let learn_forward = graph.add_clip(
+        assets.load(GltfAssetLabel::Animation(1).from_asset("cat.glb")),
+        1.0,
+        graph.root,
+    );
+
+    let start_lean_forward = graph.add_clip(
+        assets.load(GltfAssetLabel::Animation(2).from_asset("cat.glb")),
+        1.0,
+        graph.root,
+    );
+
+    let graph = graphs.add(graph);
+    commands
+        .spawn((
+            WorldAssetRoot(assets.load("cat.glb#Scene0")),
+            ColliderConstructorHierarchy::new(ColliderConstructor::ConvexDecompositionFromMesh),
+            Transform::from_xyz(-0.65, 0.0, -0.75).with_rotation(Quat::from_rotation_y(-PI / 2.0)),
+        ))
+        .observe(
+            move |ready: On<WorldInstanceReady>,
+                  mut commands: Commands,
+                  children: Query<&Children>,
+                  mut players: Query<&mut AnimationPlayer>| {
+                for child in children.iter_descendants(ready.entity) {
+                    if let Ok(mut player) = players.get_mut(child) {
+                        player.play(start_lean_forward);
+                        commands.entity(child).insert((
+                            AnimatedCustomer {
+                                idle,
+                                learn_forward,
+                                start_lean_forward,
+                            },
+                            AnimationGraphHandle(graph.clone()),
+                        ));
+                    }
+                }
+            },
+        )
+        .observe(prepare_scene_children);
+}
+
+#[derive(Component)]
+pub struct AnimatedCustomer {
+    idle: AnimationNodeIndex,
+    learn_forward: AnimationNodeIndex,
+    start_lean_forward: AnimationNodeIndex,
+}
+
+fn animation_transition(mut query: Query<(&mut AnimationPlayer, &AnimatedCustomer)>) {
+    for (mut player, anims) in query {
+        if player.all_finished() {
+            player.play(anims.learn_forward).repeat();
+        }
+    }
 }
 
 fn prepare_scene_children(
