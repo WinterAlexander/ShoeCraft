@@ -1,3 +1,4 @@
+use crate::decal::spray_decal;
 use avian3d::PhysicsPlugins;
 use avian3d::prelude::{
     ColliderConstructor, ColliderConstructorHierarchy, PhysicsDebugPlugin, RigidBody,
@@ -37,10 +38,21 @@ impl Plugin for SceneLoaderPlugin {
     }
 }
 
-fn setup_shop(mut commands: Commands, mut asset_server: ResMut<AssetServer>) {
+fn setup_shop(
+    mut commands: Commands,
+    mut assets: ResMut<AssetServer>,
+    mut standard_materials: ResMut<Assets<StandardMaterial>>,
+) {
+    let spray_material = standard_materials.add(StandardMaterial {
+        base_color: Color::srgb(1.0, 0.0, 0.0),
+        base_color_texture: Some(assets.load("splatter1.png").clone()),
+        alpha_mode: AlphaMode::Mask(0.5),
+        ..default()
+    });
+
     commands.spawn((
         SceneElement,
-        AudioPlayer::new(asset_server.load("test_song.ogg")),
+        AudioPlayer::new(assets.load("test_song.ogg")),
         PlaybackSettings::LOOP,
     ));
 
@@ -66,7 +78,7 @@ fn setup_shop(mut commands: Commands, mut asset_server: ResMut<AssetServer>) {
         }
         .build(),
     ));
-    let skybox_handle = asset_server.load(CUBEMAPS[0].0);
+    let skybox_handle = assets.load(CUBEMAPS[0].0);
 
     commands.insert_resource(Cubemap {
         is_loaded: false,
@@ -113,11 +125,19 @@ fn setup_shop(mut commands: Commands, mut asset_server: ResMut<AssetServer>) {
     ));
 
     commands.spawn((
-        WorldAssetRoot(asset_server.load("shop.glb#Scene0")),
+        WorldAssetRoot(assets.load("shop.glb#Scene0")),
         RigidBody::Static,
         ColliderConstructorHierarchy::new(ColliderConstructor::TrimeshFromMesh),
         SceneElement,
     ));
+
+    // Spray transform. In this case spraying straight down, scaled by 2 and reaching 12 meters down
+    let spray_transform = Transform::from_translation(Vec3::Y)
+        .with_scale(Vec3::ONE * 2. + Vec3::Z * 10.)
+        .looking_to(Vec3::NEG_Y, Vec3::Y);
+
+    // Finally spray the decal, which will be applied next frame
+    spray_decal(&mut commands, spray_material.clone(), spray_transform);
 }
 
 fn asset_loaded(

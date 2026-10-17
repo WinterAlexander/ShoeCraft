@@ -1,6 +1,7 @@
 mod character;
 pub mod debug;
 mod debug_camera_controller;
+pub mod decal;
 mod example2d;
 mod object_spawner;
 mod particle;
@@ -14,6 +15,7 @@ mod window_management;
 use crate::character::CharacterPlugin;
 use crate::debug::DebugPlugin;
 use crate::debug_camera_controller::DebugCameraControllerPlugin;
+use crate::decal::DecalPlugin;
 use crate::example2d::example2d::Example2DPlugin;
 use crate::example2d::topdowncameracontroller::TopDownCameraControllerPlugin;
 use crate::object_spawner::ObjectSpawnerPlugin;
@@ -77,8 +79,7 @@ fn make_3d(app: &mut App) {
             }),
     );
     app.add_plugins(InteractiveButtonPlugin);
-    app.add_plugins(SceneLoaderPlugin);
-    app.add_plugins(TitleScreenPlugin);
+    app.add_plugins((TitleScreenPlugin, DecalPlugin));
     app.add_plugins(DebugCameraControllerPlugin);
     app.add_plugins(ObjectSpawnerPlugin);
     app.add_plugins((DebugPlugin, WindowManagementPlugin, PausePlugin));
