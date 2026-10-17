@@ -79,7 +79,7 @@ impl Default for DebugCameraControllerState {
                 vertical: -45.0f32.to_radians(),
             },
             position: Vec3::new(0.0, 3.0, 3.0),
-            speed: 40.0,
+            speed: 4.0,
             enabled: false,
         }
     }

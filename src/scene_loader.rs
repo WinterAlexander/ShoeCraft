@@ -29,43 +29,15 @@ pub struct SceneElement;
 
 impl Plugin for SceneLoaderPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_basic);
-
+        app.add_systems(Startup, setup_shop);
         app.add_systems(Update, asset_loaded);
-        app.add_systems(Update, scene_switcher);
         app.add_plugins(PhysicsPlugins::default())
             .insert_resource(ClearColor(Color::srgb(0.3, 0.6, 0.9)))
             .insert_resource(DirectionalLightShadowMap { size: 4096 });
     }
 }
 
-fn scene_switcher(
-    input: Res<ButtonInput<KeyCode>>,
-    mut scene_elements: Query<(Entity, &SceneElement)>,
-    mut commands: Commands,
-    asset_server: ResMut<AssetServer>,
-) {
-    if !input.pressed(KeyCode::ControlLeft) && !input.pressed(KeyCode::ControlRight) {
-        return;
-    }
-
-    if input.just_pressed(KeyCode::Numpad1) || input.just_pressed(KeyCode::Digit1) {
-        for (entity, _) in scene_elements.iter_mut() {
-            commands.entity(entity).despawn();
-        }
-        setup_basic(commands, asset_server);
-        return;
-    } else if input.just_pressed(KeyCode::Numpad2) || input.just_pressed(KeyCode::Digit2) {
-        for (entity, _) in scene_elements.iter_mut() {
-            commands.entity(entity).despawn();
-        }
-        setup_kirby(commands, asset_server);
-        return;
-    }
-}
-
-/// set up a simple 3D scene
-fn setup_basic(mut commands: Commands, mut asset_server: ResMut<AssetServer>) {
+fn setup_shop(mut commands: Commands, mut asset_server: ResMut<AssetServer>) {
     commands.spawn((
         SceneElement,
         AudioPlayer::new(asset_server.load("test_song.ogg")),
@@ -116,7 +88,7 @@ fn setup_basic(mut commands: Commands, mut asset_server: ResMut<AssetServer>) {
             fov: 55.0f32.to_radians(),
             ..default()
         }),
-        Transform::from_xyz(-0.5, 0.3, 4.5).with_rotation(Quat::from_axis_angle(Vec3::Y, 0.0)),
+        Transform::from_xyz(-1.0, 1.0, -0.75).looking_to(Vec3::NEG_Y, Vec3::Y),
         Skybox {
             image: Some(skybox_handle.clone()),
             brightness: 1000.0,
@@ -141,97 +113,10 @@ fn setup_basic(mut commands: Commands, mut asset_server: ResMut<AssetServer>) {
     ));
 
     commands.spawn((
-        WorldAssetRoot(asset_server.load("test_scene.glb#Scene0")),
+        WorldAssetRoot(asset_server.load("shop.glb#Scene0")),
         RigidBody::Static,
         ColliderConstructorHierarchy::new(ColliderConstructor::TrimeshFromMesh),
-    ));
-}
-
-fn add_scene_tag(commands: &mut EntityCommands) {
-    commands.insert(SceneElement);
-}
-
-fn setup_kirby(mut commands: Commands, mut asset_server: ResMut<AssetServer>) {
-    commands.spawn((
         SceneElement,
-        AudioPlayer::new(asset_server.load("test_song.ogg")),
-        PlaybackSettings::LOOP,
-    ));
-
-    commands.insert_resource(ClearColor(Color::srgb(0.3, 0.6, 0.9)));
-    commands.insert_resource(DirectionalLightShadowMap { size: 4096 });
-
-    commands.insert_resource(GlobalAmbientLight {
-        color: Color::WHITE,
-        brightness: 1000.0,
-        affects_lightmapped_meshes: true,
-    });
-    commands.spawn((
-        SceneElement,
-        DirectionalLight {
-            color: Color::WHITE,
-            illuminance: 5000.0,
-            shadow_maps_enabled: true,
-            contact_shadows_enabled: true,
-            affects_lightmapped_mesh_diffuse: true,
-            shadow_depth_bias: 1.0,
-            shadow_normal_bias: 1.0,
-        },
-        CascadeShadowConfigBuilder {
-            maximum_distance: 500.0,
-            ..default()
-        }
-        .build(),
-    ));
-    let skybox_handle = asset_server.load(CUBEMAPS[0].0);
-
-    commands.insert_resource(Cubemap {
-        is_loaded: false,
-        image_handle: skybox_handle.clone(),
-    });
-
-    commands.spawn((
-        SceneElement,
-        Camera3d::default(),
-        Camera {
-            // renders after / on top of the main camera
-            order: 1,
-            // don't clear the color while rendering this camera
-            clear_color: ClearColorConfig::Default,
-            ..default()
-        },
-        Hdr,
-        Projection::Perspective(PerspectiveProjection {
-            fov: 55.0f32.to_radians(),
-            ..default()
-        }),
-        Transform::from_xyz(-0.5, 0.3, 4.5).with_rotation(Quat::from_axis_angle(Vec3::Y, 0.0)),
-        Skybox {
-            image: Some(skybox_handle.clone()),
-            brightness: 1000.0,
-            rotation: Default::default(),
-        },
-        DistanceFog {
-            color: Color::srgb(0.25, 0.25, 0.25),
-            falloff: FogFalloff::Linear {
-                start: 500.0,
-                end: 600.0,
-            },
-            ..default()
-        },
-        Msaa::Off,
-        ScreenSpaceAmbientOcclusion {
-            quality_level: ScreenSpaceAmbientOcclusionQualityLevel::Ultra,
-            ..default()
-        },
-        TemporalAntiAliasing::default(),
-        TemporalJitter::default(),
-    ));
-
-    commands.spawn((
-        WorldAssetRoot(asset_server.load("test_scene2.glb#Scene0")),
-        RigidBody::Static,
-        ColliderConstructorHierarchy::new(ColliderConstructor::ConvexDecompositionFromMesh),
     ));
 }
 

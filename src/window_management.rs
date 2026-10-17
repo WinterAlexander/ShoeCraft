@@ -9,8 +9,8 @@ pub struct WindowManagementPlugin;
 impl Plugin for WindowManagementPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, toggle_fullscreen);
-        app.add_systems(OnEnter(GameState::Game), capture_cursor);
-        app.add_systems(OnExit(GameState::Game), release_cursor);
+        //app.add_systems(OnEnter(GameState::Game), capture_cursor);
+        //app.add_systems(OnExit(GameState::Game), release_cursor);
     }
 }
 
