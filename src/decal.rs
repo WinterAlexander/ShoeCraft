@@ -5,8 +5,7 @@ use bevy::render::mesh::Indices;
 use bevy::render::mesh::VertexAttributeValues;
 use bevy::render::render_resource::PrimitiveTopology;
 
-const DECAL_REMOVE_BACKFACES: bool = false; // When false, both sides of the mesh will be sprayed with a decal
-const DECAL_MAX_PER_ENTTIY: usize = 64; // Max number of decals you can stick on one entity
+const DECAL_REMOVE_BACKFACES: bool = true; // When false, both sides of the mesh will be sprayed with a decal
 const DECAL_EPSILON: f32 = 0.00016; // The offset of the decal from the base mesh, to prevent Z-fighting
 
 /// Decalable component. Add this to entities that you wish to apply decals onto.
@@ -355,10 +354,6 @@ fn decal_system(
 
     for (decal_entity, transform, decal) in decals.iter_mut() {
         for (model_entity, model_mesh, global_transform, mut decalable) in models.iter_mut() {
-            if decalable.0 >= DECAL_MAX_PER_ENTTIY {
-                continue;
-            }
-
             // `GlobalTransform` on its own is what maps mesh vertices to world
             // space. Composing the entity's local `Transform` on top of it as
             // well (`global.mul_transform(local)`) would apply the node's

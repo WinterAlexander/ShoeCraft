@@ -6,6 +6,7 @@ use bevy::camera::{Camera, Camera3d};
 use bevy::color::Color;
 use bevy::input::ButtonInput;
 use bevy::material::AlphaMode;
+use bevy::math::Quat;
 use bevy::mesh::Mesh3d;
 use bevy::pbr::StandardMaterial;
 use bevy::prelude::{
@@ -13,6 +14,7 @@ use bevy::prelude::{
     Window, With, Without, default,
 };
 use bevy::window::PrimaryWindow;
+use std::f32::consts::PI;
 
 pub struct DrawingPlugin;
 
@@ -50,9 +52,10 @@ fn draw(
         };
 
         if let Ok(ray) = camera_query.0.viewport_to_world(&camera_query.1, position) {
-            let spray_transform = Transform::from_translation(ray.origin)
+            let mut spray_transform = Transform::from_translation(ray.origin)
                 .looking_to(ray.direction, camera_query.1.up())
                 .with_scale(Vec3::ONE * 0.01 + Vec3::Z * 50.0);
+            spray_transform.rotate_local_z(rand::random::<f32>() * PI * 2.0);
 
             let spray_material = standard_materials.add(StandardMaterial {
                 base_color: Color::srgb(0.1, 0.1, 0.1),

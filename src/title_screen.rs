@@ -30,9 +30,7 @@ impl Plugin for TitleScreenPlugin {
     }
 }
 
-fn setup(mut commands: Commands) {
-    commands.spawn(Camera2d::default());
-}
+fn setup(mut commands: Commands) {}
 
 fn on_enter(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
