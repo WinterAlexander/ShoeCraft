@@ -1,5 +1,6 @@
 use crate::command::{Command, CommandSupport};
 use crate::customer::{AnimatedCustomer, CustomerCollider};
+use crate::cutting::Knife;
 use crate::shop::LeatherSheet;
 use crate::title_screen::GameState;
 use avian3d::parry::glamx::Vec3;
@@ -10,13 +11,13 @@ use bevy::camera::{Camera, Camera3d};
 use bevy::color::Color;
 use bevy::input::ButtonInput;
 use bevy::material::AlphaMode;
-use bevy::math::{Affine3A, Quat};
+use bevy::math::Quat;
 use bevy::pbr::decal::{ForwardDecal, ForwardDecalMaterial, ForwardDecalMaterialExt};
 use bevy::pbr::{MeshMaterial3d, StandardMaterial};
 use bevy::prelude::{
-    Children, Commands, Component, DelayedCommandsExt, EaseFunction, Entity, GlobalTransform,
-    IntoScheduleConfigs, MouseButton, Name, NextState, Query, Res, ResMut, Resource, Single,
-    Touches, Transform, Window, With, Without, default, in_state,
+    Children, Commands, Component, EaseFunction, Entity, GlobalTransform, IntoScheduleConfigs,
+    MouseButton, NextState, Query, Res, ResMut, Resource, Single, Touches, Transform, Window, With,
+    Without, default, in_state,
 };
 use bevy::window::PrimaryWindow;
 use std::f32::consts::PI;
@@ -25,6 +26,8 @@ pub struct DrawingPlugin;
 
 #[derive(Component)]
 pub struct Pencil {
+    in_hand: bool,
+    first_click: bool,
     draw_normal: Vec3,
     on_sheet: bool,
     on_customer: bool,
@@ -43,6 +46,8 @@ pub struct DrawnOnCustomerTracker {
 impl Pencil {
     pub fn default() -> Self {
         Pencil {
+            in_hand: false,
+            first_click: true,
             draw_normal: Vec3::ZERO,
             on_sheet: false,
             on_customer: false,
@@ -55,7 +60,8 @@ impl Plugin for DrawingPlugin {
         app.add_systems(Startup, init_spray_material);
         app.add_systems(
             Update,
-            (draw, move_pencil).run_if(in_state(GameState::Drawing)),
+            (draw, move_pencil, drawing_done_handler, pick_up_pencil)
+                .run_if(in_state(GameState::Drawing)),
         );
         app.add_systems(Update, keep_drawings_on_sheet);
         app.insert_resource(DrawnOnCustomerTracker::default());
@@ -97,6 +103,10 @@ fn move_pencil(
     sheet: Single<Entity, With<LeatherSheet>>,
     customer: Single<Entity, (With<CustomerCollider>, Without<LeatherSheet>)>,
 ) {
+    if !pencil.2.in_hand {
+        return;
+    }
+
     let position = if let Some(touch) = touches.iter().next() {
         touch.position()
     } else if let Some(cursor_pos) = window_query.cursor_position() {
@@ -139,17 +149,25 @@ fn draw(
     mut commands: Commands,
     buttons: Res<ButtonInput<MouseButton>>,
     spray_material: Res<SprayMaterial>,
-    pencil: Single<(&Transform, &Pencil)>,
+    mut pencil: Single<(&Transform, &mut Pencil)>,
     sheet: Single<&Transform, (With<LeatherSheet>, Without<Pencil>)>,
     mut drawn_on_customer_tracker: ResMut<DrawnOnCustomerTracker>,
     mut camera: Single<&mut CommandSupport, With<Camera3d>>,
     mut customer: Single<&mut AnimatedCustomer>,
 ) {
+    if !pencil.1.in_hand {
+        return;
+    }
+
     if buttons.just_pressed(MouseButton::Left) {
         customer.anger_cancel_click = false;
     }
 
-    if buttons.pressed(MouseButton::Left) && !customer.anger_cancel_click {
+    if !buttons.pressed(MouseButton::Left) {
+        pencil.1.first_click = false;
+    }
+
+    if buttons.pressed(MouseButton::Left) && !customer.anger_cancel_click && !pencil.1.first_click {
         let mut transform = Transform::from_translation(pencil.0.translation)
             .with_scale(Vec3::ONE * 0.03)
             .with_rotation(Quat::from_rotation_arc(Vec3::Y, pencil.1.draw_normal));
@@ -199,16 +217,114 @@ fn draw(
 }
 
 fn keep_drawings_on_sheet(
+    sheet_query: Single<&Transform, With<LeatherSheet>>,
+    drawing_query: Query<(&mut Transform, &ValidDrawing), Without<LeatherSheet>>,
+) {
+    for (mut trans, drawing_spot) in drawing_query {
+        *trans = **sheet_query * drawing_spot.sheet_offset;
+    }
+}
+
+fn drawing_done_handler(
     buttons: Res<ButtonInput<MouseButton>>,
     mut next_state: ResMut<NextState<GameState>>,
-    mut sheet_query: Single<&mut Transform, With<LeatherSheet>>,
-    drawing_query: Query<(&mut Transform, &ValidDrawing), (Without<LeatherSheet>)>,
+    mut pencil: Single<&mut Pencil>,
+    mut sheet_query: Single<(&Transform, &mut CommandSupport), With<LeatherSheet>>,
+    mut camera_query: Single<
+        (&Transform, &mut CommandSupport),
+        (With<Camera3d>, Without<LeatherSheet>),
+    >,
 ) {
     if buttons.just_pressed(MouseButton::Right) {
-        next_state.set(GameState::DrawingToCutting);
-        sheet_query.translation += Vec3::new(0.0, 0.6148, -0.6148);
-        for (mut trans, drawing_spot) in drawing_query {
-            *trans = **sheet_query * drawing_spot.sheet_offset;
-        }
+        next_state.set(GameState::Cutting);
+        pencil.in_hand = false;
+        let (sheet_transform, sheet_commands) = (sheet_query.0, &mut sheet_query.1);
+        let (cam_transform, cam_commands) = (camera_query.0, &mut camera_query.1);
+        let mut new_transform = sheet_transform.clone();
+        new_transform.translation += Vec3::new(0.0, 0.6148, 0.0);
+        let mut new_cam_transform = cam_transform.clone();
+        new_cam_transform.look_at(new_transform.translation, Vec3::Y);
+
+        sheet_commands.queue(Command::new_transition(
+            new_transform.clone(),
+            1.0,
+            EaseFunction::SmoothStep,
+        ));
+        cam_commands.queue(Command::new_transition(
+            new_cam_transform.clone(),
+            1.0,
+            EaseFunction::SmoothStep,
+        ));
+
+        new_transform.translation += Vec3::new(0.0, 0.0, -0.6148);
+        new_cam_transform.look_at(new_transform.translation, Vec3::Y);
+        sheet_commands.queue(Command::new_transition(
+            new_transform.clone(),
+            1.0,
+            EaseFunction::SmoothStep,
+        ));
+        cam_commands.queue(Command::new_transition(
+            new_cam_transform.clone(),
+            1.0,
+            EaseFunction::SmoothStep,
+        ));
+        new_transform.rotate_y(PI / 2.0);
+        new_cam_transform.translation += Vec3::X * 0.35;
+        new_cam_transform.look_at(new_transform.translation, Vec3::Y);
+        sheet_commands.queue(Command::new_transition(
+            new_transform.clone(),
+            1.0,
+            EaseFunction::SmoothStep,
+        ));
+
+        cam_commands.queue(Command::new_transition(
+            new_cam_transform.clone(),
+            1.0,
+            EaseFunction::SmoothStep,
+        ));
     }
+}
+
+fn pick_up_pencil(
+    mut pencil: Single<(Entity, &mut Pencil)>,
+    buttons: Res<ButtonInput<MouseButton>>,
+    touches: Res<Touches>,
+    window_query: Single<&Window, With<PrimaryWindow>>,
+    camera_query: Single<(&Camera, &GlobalTransform)>,
+    spatial_query: SpatialQuery,
+    children: Query<&Children>,
+) {
+    if pencil.1.in_hand {
+        return;
+    }
+    if !buttons.just_pressed(MouseButton::Left) {
+        return;
+    }
+
+    let position = if let Some(touch) = touches.iter().next() {
+        touch.position()
+    } else if let Some(cursor_pos) = window_query.cursor_position() {
+        cursor_pos
+    } else {
+        return;
+    };
+    let Ok(ray) = camera_query.0.viewport_to_world(&camera_query.1, position) else {
+        return;
+    };
+
+    let Some(_hit) = spatial_query.cast_ray_predicate(
+        ray.origin,
+        ray.direction,
+        50.0,
+        false,
+        &SpatialQueryFilter::default(),
+        &|entity| {
+            // If entity is not the pencil, skip
+            entity == pencil.0 || !children.iter_descendants(pencil.0).any(|e| e == entity)
+        },
+    ) else {
+        return;
+    };
+
+    pencil.1.in_hand = true;
 }

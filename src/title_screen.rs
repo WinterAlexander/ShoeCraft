@@ -1,6 +1,5 @@
 use crate::ui::interactive_button::InteractiveButton;
 use bevy::prelude::*;
-use bevy::window::{CursorGrabMode, CursorOptions};
 
 pub struct TitleScreenPlugin;
 
@@ -15,14 +14,12 @@ pub enum GameState {
     #[default]
     TitleScreen,
     Drawing,
-    DrawingToCutting,
     Cutting,
     Paused,
 }
 
 impl Plugin for TitleScreenPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup);
         app.add_systems(OnEnter(GameState::TitleScreen), on_enter);
         app.add_systems(OnExit(GameState::TitleScreen), clean);
         app.add_systems(
@@ -31,8 +28,6 @@ impl Plugin for TitleScreenPlugin {
         );
     }
 }
-
-fn setup(mut commands: Commands) {}
 
 fn on_enter(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands

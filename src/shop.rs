@@ -1,4 +1,5 @@
 use crate::command::CommandSupport;
+use crate::cutting::Knife;
 use crate::drawing::Pencil;
 use avian3d::PhysicsPlugins;
 use avian3d::prelude::{ColliderConstructor, ColliderConstructorHierarchy};
@@ -7,7 +8,6 @@ use bevy::camera::Hdr;
 use bevy::core_pipeline::prepass::DepthPrepass;
 use bevy::light::{CascadeShadowConfigBuilder, DirectionalLightShadowMap};
 use bevy::pbr::{ScreenSpaceAmbientOcclusion, ScreenSpaceAmbientOcclusionQualityLevel};
-use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use bevy::render::camera::TemporalJitter;
 use bevy::world_serialization::WorldInstanceReady;
@@ -112,6 +112,9 @@ fn prepare_scene_children(
             match name.as_str() {
                 "Pencil" => {
                     commands.entity(child).insert(Pencil::default());
+                }
+                "Knife" => {
+                    commands.entity(child).insert(Knife::default());
                 }
                 "Leather Sheet" => {
                     commands

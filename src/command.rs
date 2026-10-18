@@ -16,6 +16,12 @@ pub struct CommandSupport {
     pub command_queue: VecDeque<Command>,
 }
 
+impl CommandSupport {
+    pub fn queue(&mut self, command: Command) {
+        self.command_queue.push_back(command);
+    }
+}
+
 pub enum Command {
     Transition {
         destination: Transform,
