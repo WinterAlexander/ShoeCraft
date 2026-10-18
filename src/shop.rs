@@ -1,5 +1,5 @@
 use crate::command::CommandSupport;
-use crate::cutting::Knife;
+use crate::cutting::{Cuttable, Knife};
 use crate::drawing::Pencil;
 use avian3d::PhysicsPlugins;
 use avian3d::prelude::{ColliderConstructor, ColliderConstructorHierarchy};
@@ -21,7 +21,7 @@ impl Plugin for ShopPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_shop);
         app.add_plugins(PhysicsPlugins::default())
-            .insert_resource(ClearColor(Color::srgb(0.3, 0.6, 0.9)))
+            .insert_resource(ClearColor(Color::WHITE))
             .insert_resource(DirectionalLightShadowMap { size: 4096 });
     }
 }
@@ -117,9 +117,11 @@ fn prepare_scene_children(
                     commands.entity(child).insert(Knife::default());
                 }
                 "Leather Sheet" => {
-                    commands
-                        .entity(child)
-                        .insert((LeatherSheet, CommandSupport::default()));
+                    commands.entity(child).insert((
+                        LeatherSheet,
+                        CommandSupport::default(),
+                        Cuttable::default(),
+                    ));
                 }
                 _ => {
                     if name.contains("Pencil") {
