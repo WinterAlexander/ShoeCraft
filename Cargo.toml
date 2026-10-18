@@ -13,7 +13,7 @@ bevy_show_prepass = "0.3.0"
 bevy-inspector-egui = "0.37"
 
 [profile.dev]
-opt-level = 1
+opt-level = 0
 
 [profile.dev.package."*"]
 opt-level = 3

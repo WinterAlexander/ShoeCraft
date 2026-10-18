@@ -3,10 +3,11 @@ use avian3d::prelude::{ColliderConstructor, ColliderConstructorHierarchy};
 use bevy::animation::AnimationPlayer;
 use bevy::app::{App, Plugin, Startup, Update};
 use bevy::asset::{AssetServer, Assets};
-use bevy::gltf::GltfAssetLabel;
+use bevy::gltf::{GltfAssetLabel, GltfMaterialName};
+use bevy::pbr::{MeshMaterial3d, StandardMaterial};
 use bevy::prelude::{
-    AnimationGraph, AnimationGraphHandle, AnimationNodeIndex, Children, Commands, Component, On,
-    Query, ResMut, Transform, Visibility, WorldAssetRoot,
+    AnimationGraph, AnimationGraphHandle, AnimationNodeIndex, Children, Commands, Component,
+    Entity, On, Query, Res, ResMut, Time, Transform, Visibility, WorldAssetRoot,
 };
 use bevy::world_serialization::WorldInstanceReady;
 use std::f32::consts::PI;
@@ -19,6 +20,11 @@ pub struct AnimatedCustomer {
     idle: AnimationNodeIndex,
     learn_forward: AnimationNodeIndex,
     start_lean_forward: AnimationNodeIndex,
+    pub angry: bool,
+    pub render_angry: bool,
+    pub angry_timer: f32,
+    pub not_angry_timer: f32,
+    pub anger_cancel_click: bool,
 }
 
 pub struct CustomerPlugin;
@@ -26,7 +32,10 @@ pub struct CustomerPlugin;
 impl Plugin for CustomerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_customer);
-        app.add_systems(Update, (animation_transition));
+        app.add_systems(
+            Update,
+            (animation_transition, update_customer_angry_material),
+        );
     }
 }
 
@@ -83,6 +92,11 @@ fn spawn_customer(
                                 idle,
                                 learn_forward,
                                 start_lean_forward,
+                                angry: false,
+                                render_angry: false,
+                                angry_timer: 0.0,
+                                not_angry_timer: 0.0,
+                                anger_cancel_click: false,
                             },
                             AnimationGraphHandle(graph.clone()),
                         ));
@@ -98,4 +112,62 @@ fn spawn_customer(
         Visibility::Hidden,
         CustomerCollider,
     ));
+}
+
+fn update_customer_angry_material(
+    mut commands: Commands,
+    customers: Query<(Entity, &mut AnimatedCustomer)>,
+    children: Query<&Children>,
+    materials: Query<(&MeshMaterial3d<StandardMaterial>, &GltfMaterialName)>,
+    mut material_assets: ResMut<Assets<StandardMaterial>>,
+    assets: Res<AssetServer>,
+    time: Res<Time>,
+) {
+    for mut customer in customers {
+        if customer.1.angry {
+            if customer.1.angry_timer > 0.0 {
+                customer.1.angry_timer -= time.delta_secs();
+                if customer.1.angry_timer <= 0.0 {
+                    customer.1.angry = false;
+                }
+            }
+        } else {
+            if customer.1.not_angry_timer > 0.0 {
+                customer.1.not_angry_timer -= time.delta_secs();
+                if customer.1.not_angry_timer <= 0.0 {
+                    customer.1.angry = true;
+                }
+            }
+        }
+
+        if customer.1.angry == customer.1.render_angry {
+            continue;
+        }
+        let regular_material_tex = assets.load("cat.glb#Texture1");
+        let angry_material_tex = assets.load("cat.glb#Texture0");
+
+        for descendant in children.iter_descendants(customer.0) {
+            if let Ok((id, material_name)) = materials.get(descendant) {
+                let Some(material) = material_assets.get(id.id()) else {
+                    continue;
+                };
+
+                if customer.1.angry {
+                    let mut new_material = material.clone();
+                    new_material.base_color_texture = Some(angry_material_tex.clone());
+                    commands
+                        .entity(descendant)
+                        .insert(MeshMaterial3d(material_assets.add(new_material)));
+                } else {
+                    let mut new_material = material.clone();
+                    new_material.base_color_texture = Some(regular_material_tex.clone());
+                    commands
+                        .entity(descendant)
+                        .insert(MeshMaterial3d(material_assets.add(new_material)));
+                }
+            }
+        }
+
+        customer.1.render_angry = customer.1.angry;
+    }
 }

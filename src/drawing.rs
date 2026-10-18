@@ -1,5 +1,5 @@
 use crate::camera_command::{CameraCommand, ControllableCamera};
-use crate::customer::CustomerCollider;
+use crate::customer::{AnimatedCustomer, CustomerCollider};
 use crate::shop::LeatherSheet;
 use crate::title_screen::GameState;
 use avian3d::parry::glamx::Vec3;
@@ -14,9 +14,9 @@ use bevy::math::Quat;
 use bevy::pbr::decal::{ForwardDecal, ForwardDecalMaterial, ForwardDecalMaterialExt};
 use bevy::pbr::{MeshMaterial3d, StandardMaterial};
 use bevy::prelude::{
-    Children, Commands, Component, EaseFunction, Entity, GlobalTransform, IntoScheduleConfigs,
-    MouseButton, Name, NextState, Query, Res, ResMut, Resource, Single, Touches, Transform, Window,
-    With, Without, default, in_state,
+    Children, Commands, Component, DelayedCommandsExt, EaseFunction, Entity, GlobalTransform,
+    IntoScheduleConfigs, MouseButton, Name, NextState, Query, Res, ResMut, Resource, Single,
+    Touches, Transform, Window, With, Without, default, in_state,
 };
 use bevy::window::PrimaryWindow;
 use std::f32::consts::PI;
@@ -139,8 +139,13 @@ fn draw(
     pencil: Single<(&Transform, &Pencil)>,
     mut drawn_on_customer_tracker: ResMut<DrawnOnCustomerTracker>,
     mut camera: Single<&mut ControllableCamera>,
+    mut customer: Single<&mut AnimatedCustomer>,
 ) {
-    if buttons.pressed(MouseButton::Left) {
+    if buttons.just_pressed(MouseButton::Left) {
+        customer.anger_cancel_click = false;
+    }
+
+    if buttons.pressed(MouseButton::Left) && !customer.anger_cancel_click {
         let mut transform = Transform::from_translation(pencil.0.translation)
             .with_scale(Vec3::ONE * 0.03)
             .with_rotation(Quat::from_rotation_arc(Vec3::Y, pencil.1.draw_normal));
@@ -158,7 +163,10 @@ fn draw(
         if pencil.1.on_customer {
             drawn_on_customer_tracker.draw_count += 1;
             if drawn_on_customer_tracker.draw_count > 2 {
+                customer.anger_cancel_click = true;
                 if camera.command_queue.len() == 0 {
+                    customer.not_angry_timer = 1.5;
+                    //customer.angry_timer = 2.5;
                     camera.command_queue.extend([
                         CameraCommand::new_transition(
                             Transform::from_xyz(-1.5, 1.0, -0.75)
@@ -166,7 +174,7 @@ fn draw(
                             1.0,
                             EaseFunction::SmoothStep,
                         ),
-                        CameraCommand::Wait(1.0),
+                        CameraCommand::Wait(2.0),
                         CameraCommand::new_transition(
                             Transform::from_xyz(-1.5, 1.0, -0.75)
                                 .looking_at(Vec3::new(-1.3, 0.0, -0.75), Vec3::Y),
@@ -184,7 +192,6 @@ fn draw(
 }
 
 fn handle_draw_end(
-    mut commands: Commands,
     buttons: Res<ButtonInput<MouseButton>>,
     mut next_state: ResMut<NextState<GameState>>,
     mut sheet_query: Single<&mut Transform, With<LeatherSheet>>,
