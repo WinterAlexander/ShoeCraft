@@ -1,4 +1,4 @@
-use crate::camera_command::{CameraCommand, ControllableCamera};
+use crate::command::{Command, CommandSupport};
 use crate::customer::{AnimatedCustomer, CustomerCollider};
 use crate::shop::LeatherSheet;
 use crate::title_screen::GameState;
@@ -6,11 +6,11 @@ use avian3d::parry::glamx::Vec3;
 use avian3d::prelude::{SpatialQuery, SpatialQueryFilter};
 use bevy::app::{App, Plugin, Startup, Update};
 use bevy::asset::{AssetServer, Assets, Handle};
-use bevy::camera::Camera;
+use bevy::camera::{Camera, Camera3d};
 use bevy::color::Color;
 use bevy::input::ButtonInput;
 use bevy::material::AlphaMode;
-use bevy::math::Quat;
+use bevy::math::{Affine3A, Quat};
 use bevy::pbr::decal::{ForwardDecal, ForwardDecalMaterial, ForwardDecalMaterialExt};
 use bevy::pbr::{MeshMaterial3d, StandardMaterial};
 use bevy::prelude::{
@@ -31,7 +31,9 @@ pub struct Pencil {
 }
 
 #[derive(Component)]
-pub struct ValidDrawing;
+pub struct ValidDrawing {
+    sheet_offset: Transform,
+}
 
 #[derive(Resource, Default)]
 pub struct DrawnOnCustomerTracker {
@@ -53,8 +55,9 @@ impl Plugin for DrawingPlugin {
         app.add_systems(Startup, init_spray_material);
         app.add_systems(
             Update,
-            (draw, move_pencil, handle_draw_end).run_if(in_state(GameState::Drawing)),
+            (draw, move_pencil).run_if(in_state(GameState::Drawing)),
         );
+        app.add_systems(Update, keep_drawings_on_sheet);
         app.insert_resource(DrawnOnCustomerTracker::default());
     }
 }
@@ -137,8 +140,9 @@ fn draw(
     buttons: Res<ButtonInput<MouseButton>>,
     spray_material: Res<SprayMaterial>,
     pencil: Single<(&Transform, &Pencil)>,
+    sheet: Single<&Transform, (With<LeatherSheet>, Without<Pencil>)>,
     mut drawn_on_customer_tracker: ResMut<DrawnOnCustomerTracker>,
-    mut camera: Single<&mut ControllableCamera>,
+    mut camera: Single<&mut CommandSupport, With<Camera3d>>,
     mut customer: Single<&mut AnimatedCustomer>,
 ) {
     if buttons.just_pressed(MouseButton::Left) {
@@ -157,7 +161,10 @@ fn draw(
         ));
 
         if pencil.1.on_sheet {
-            entity_commands.insert(ValidDrawing);
+            entity_commands.insert(ValidDrawing {
+                sheet_offset: Transform::from_matrix(sheet.compute_affine().inverse().into())
+                    * transform,
+            });
         }
 
         if pencil.1.on_customer {
@@ -168,14 +175,14 @@ fn draw(
                     customer.not_angry_timer = 1.5;
                     //customer.angry_timer = 2.5;
                     camera.command_queue.extend([
-                        CameraCommand::new_transition(
+                        Command::new_transition(
                             Transform::from_xyz(-1.5, 1.0, -0.75)
                                 .looking_at(Vec3::new(-1.3, 1.0, -0.75), Vec3::Y),
                             1.0,
                             EaseFunction::SmoothStep,
                         ),
-                        CameraCommand::Wait(2.0),
-                        CameraCommand::new_transition(
+                        Command::Wait(2.0),
+                        Command::new_transition(
                             Transform::from_xyz(-1.5, 1.0, -0.75)
                                 .looking_at(Vec3::new(-1.3, 0.0, -0.75), Vec3::Y),
                             1.0,
@@ -191,17 +198,17 @@ fn draw(
     }
 }
 
-fn handle_draw_end(
+fn keep_drawings_on_sheet(
     buttons: Res<ButtonInput<MouseButton>>,
     mut next_state: ResMut<NextState<GameState>>,
     mut sheet_query: Single<&mut Transform, With<LeatherSheet>>,
-    drawing_query: Query<&mut Transform, (With<ValidDrawing>, Without<LeatherSheet>)>,
+    drawing_query: Query<(&mut Transform, &ValidDrawing), (Without<LeatherSheet>)>,
 ) {
     if buttons.just_pressed(MouseButton::Right) {
         next_state.set(GameState::DrawingToCutting);
         sheet_query.translation += Vec3::new(0.0, 0.6148, -0.6148);
-        for mut drawing_spot in drawing_query {
-            drawing_spot.translation += Vec3::new(0.0, 0.6148, -0.6148);
+        for (mut trans, drawing_spot) in drawing_query {
+            *trans = **sheet_query * drawing_spot.sheet_offset;
         }
     }
 }

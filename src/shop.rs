@@ -1,4 +1,4 @@
-use crate::camera_command::ControllableCamera;
+use crate::command::CommandSupport;
 use crate::drawing::Pencil;
 use avian3d::PhysicsPlugins;
 use avian3d::prelude::{ColliderConstructor, ColliderConstructorHierarchy};
@@ -67,7 +67,7 @@ fn setup_shop(mut commands: Commands, assets: ResMut<AssetServer>) {
             clear_color: ClearColorConfig::Default,
             ..default()
         },
-        ControllableCamera::default(),
+        CommandSupport::default(),
         Hdr,
         Projection::Perspective(PerspectiveProjection {
             fov: 55.0f32.to_radians(),
@@ -114,7 +114,9 @@ fn prepare_scene_children(
                     commands.entity(child).insert(Pencil::default());
                 }
                 "Leather Sheet" => {
-                    commands.entity(child).insert(LeatherSheet);
+                    commands
+                        .entity(child)
+                        .insert((LeatherSheet, CommandSupport::default()));
                 }
                 _ => {
                     if name.contains("Pencil") {

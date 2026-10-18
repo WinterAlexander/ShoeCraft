@@ -1,21 +1,23 @@
-mod camera_command;
+mod command;
 mod customer;
 mod debug;
 mod debug_camera_controller;
 mod drawing;
 mod particle;
 mod pause;
+mod scissors;
 mod shop;
 mod title_screen;
 mod ui;
 mod window_management;
 
-use crate::camera_command::CameraCommandPlugin;
+use crate::command::CommandPlugin;
 use crate::customer::CustomerPlugin;
 use crate::debug::DebugPlugin;
 use crate::debug_camera_controller::DebugCameraControllerPlugin;
 use crate::drawing::DrawingPlugin;
 use crate::pause::PausePlugin;
+use crate::scissors::ScissorsPlugin;
 use crate::shop::ShopPlugin;
 use crate::title_screen::{GameState, TitleScreenPlugin};
 use crate::ui::interactive_button::InteractiveButtonPlugin;
@@ -72,10 +74,12 @@ fn main() {
             }),
     );
     app.add_plugins(InteractiveButtonPlugin);
-    app.add_plugins(CameraCommandPlugin);
+    app.add_plugins(CommandPlugin);
     app.add_plugins((ShopPlugin, TitleScreenPlugin));
     app.add_plugins(DebugCameraControllerPlugin);
-    app.add_plugins((DrawingPlugin, CustomerPlugin));
+    app.add_plugins(DrawingPlugin);
+    app.add_plugins(CustomerPlugin);
+    app.add_plugins(ScissorsPlugin);
     app.add_plugins((
         DebugPlugin,
         WindowManagementPlugin,

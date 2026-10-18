@@ -3,20 +3,20 @@ use bevy::math::Curve;
 use bevy::prelude::{Component, EaseFunction, Query, Res, Time, Transform};
 use std::collections::VecDeque;
 
-pub struct CameraCommandPlugin;
+pub struct CommandPlugin;
 
-impl Plugin for CameraCommandPlugin {
+impl Plugin for CommandPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, operate_camera);
+        app.add_systems(Update, execute_commands);
     }
 }
 
 #[derive(Component, Default)]
-pub struct ControllableCamera {
-    pub command_queue: VecDeque<CameraCommand>,
+pub struct CommandSupport {
+    pub command_queue: VecDeque<Command>,
 }
 
-pub enum CameraCommand {
+pub enum Command {
     Transition {
         destination: Transform,
         duration: f32,
@@ -24,16 +24,16 @@ pub enum CameraCommand {
         start_time: Option<f64>,
         start_position: Option<Transform>,
     },
-    Wait(f32), // Shake { duration: f32 }
+    Wait(f32),
 }
 
-impl CameraCommand {
+impl Command {
     pub fn new_transition(
         destination: Transform,
         duration: f32,
         ease_function: EaseFunction,
-    ) -> CameraCommand {
-        CameraCommand::Transition {
+    ) -> Command {
+        Command::Transition {
             destination,
             duration,
             ease_function,
@@ -43,14 +43,14 @@ impl CameraCommand {
     }
 }
 
-fn operate_camera(cameras: Query<(&mut Transform, &mut ControllableCamera)>, time: Res<Time>) {
+fn execute_commands(cameras: Query<(&mut Transform, &mut CommandSupport)>, time: Res<Time>) {
     for (mut trans, mut cam) in cameras {
         if cam.command_queue.len() == 0 {
             continue;
         }
 
         match &mut cam.command_queue[0] {
-            CameraCommand::Transition {
+            Command::Transition {
                 destination,
                 duration,
                 ease_function,
@@ -66,7 +66,7 @@ fn operate_camera(cameras: Query<(&mut Transform, &mut ControllableCamera)>, tim
                     cam.command_queue.pop_front();
                 }
             }
-            CameraCommand::Transition {
+            Command::Transition {
                 destination: _destination,
                 duration: _duration,
                 ease_function: _ease_function,
@@ -76,7 +76,7 @@ fn operate_camera(cameras: Query<(&mut Transform, &mut ControllableCamera)>, tim
                 *start_time = Some(time.elapsed_secs_f64());
                 *start_position = Some(trans.clone());
             }
-            CameraCommand::Wait(duration) => {
+            Command::Wait(duration) => {
                 *duration -= time.delta_secs();
                 if *duration <= 0.0 {
                     cam.command_queue.pop_front();
