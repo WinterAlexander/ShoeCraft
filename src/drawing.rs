@@ -87,7 +87,7 @@ fn init_spray_material(
                 ..default()
             },
             extension: ForwardDecalMaterialExt {
-                depth_fade_factor: 1.0,
+                depth_fade_factor: 0.01,
             },
         }),
     })
