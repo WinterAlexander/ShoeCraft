@@ -3,7 +3,7 @@ mod debug_camera_controller;
 mod drawing;
 mod particle;
 mod pause;
-mod scene_loader;
+mod shop;
 mod title_screen;
 mod ui;
 mod window_management;
@@ -12,7 +12,7 @@ use crate::debug::DebugPlugin;
 use crate::debug_camera_controller::DebugCameraControllerPlugin;
 use crate::drawing::DrawingPlugin;
 use crate::pause::PausePlugin;
-use crate::scene_loader::SceneLoaderPlugin;
+use crate::shop::ShopPlugin;
 use crate::title_screen::{GameState, TitleScreenPlugin};
 use crate::ui::interactive_button::InteractiveButtonPlugin;
 use crate::window_management::WindowManagementPlugin;
@@ -68,7 +68,7 @@ fn main() {
             }),
     );
     app.add_plugins(InteractiveButtonPlugin);
-    app.add_plugins((SceneLoaderPlugin, TitleScreenPlugin));
+    app.add_plugins((ShopPlugin, TitleScreenPlugin));
     app.add_plugins(DebugCameraControllerPlugin);
     app.add_plugins(DrawingPlugin);
     app.add_plugins((

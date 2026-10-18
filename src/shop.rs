@@ -3,33 +3,24 @@ use avian3d::PhysicsPlugins;
 use avian3d::prelude::{ColliderConstructor, ColliderConstructorHierarchy};
 use bevy::anti_alias::taa::TemporalAntiAliasing;
 use bevy::camera::Hdr;
-use bevy::core_pipeline::Skybox;
 use bevy::core_pipeline::prepass::DepthPrepass;
-use bevy::image::CompressedImageFormats;
 use bevy::light::{CascadeShadowConfigBuilder, DirectionalLightShadowMap};
 use bevy::pbr::{ScreenSpaceAmbientOcclusion, ScreenSpaceAmbientOcclusionQualityLevel};
 use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use bevy::render::camera::TemporalJitter;
-use bevy::render::render_resource::{TextureViewDescriptor, TextureViewDimension};
 use bevy::world_serialization::WorldInstanceReady;
 use std::f32::consts::PI;
 
-pub struct SceneLoaderPlugin;
+pub struct ShopPlugin;
 
-pub const CUBEMAPS: &[(&str, CompressedImageFormats)] =
-    &[("test_skybox.png", CompressedImageFormats::NONE)];
+#[derive(Component)]
+pub struct LeatherSheet;
 
-#[derive(Resource)]
-pub struct Cubemap {
-    pub(crate) is_loaded: bool,
-    pub(crate) image_handle: Handle<Image>,
-}
-
-impl Plugin for SceneLoaderPlugin {
+impl Plugin for ShopPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_shop);
-        app.add_systems(Update, (asset_loaded, animation_transition));
+        app.add_systems(Update, (animation_transition));
         app.add_plugins(PhysicsPlugins::default())
             .insert_resource(ClearColor(Color::srgb(0.3, 0.6, 0.9)))
             .insert_resource(DirectionalLightShadowMap { size: 4096 });
@@ -68,12 +59,6 @@ fn setup_shop(
         }
         .build(),
     ));
-    let skybox_handle = assets.load(CUBEMAPS[0].0);
-
-    commands.insert_resource(Cubemap {
-        is_loaded: false,
-        image_handle: skybox_handle.clone(),
-    });
 
     commands.spawn((
         //NormalPrepass,
@@ -93,11 +78,6 @@ fn setup_shop(
             ..default()
         }),
         Transform::from_xyz(-1.5, 1.0, -0.75).looking_at(Vec3::new(-1.3, 0.0, -0.75), Vec3::Y),
-        Skybox {
-            image: Some(skybox_handle.clone()),
-            brightness: 1000.0,
-            rotation: Default::default(),
-        },
         DistanceFog {
             color: Color::srgb(5.0, 0.25, 0.25),
             falloff: FogFalloff::Linear {
@@ -200,6 +180,9 @@ fn prepare_scene_children(
                 "Pencil" => {
                     commands.entity(child).insert(Pencil::default());
                 }
+                "Leather Sheet" => {
+                    commands.entity(child).insert(LeatherSheet);
+                }
                 _ => {
                     if name.contains("Pencil") {
                         // Pencil's materials
@@ -209,32 +192,5 @@ fn prepare_scene_children(
                 }
             }
         }
-    }
-}
-
-fn asset_loaded(
-    asset_server: Res<AssetServer>,
-    mut images: ResMut<Assets<Image>>,
-    mut cubemap: ResMut<Cubemap>,
-    mut skyboxes: Query<&mut Skybox>,
-) {
-    if !cubemap.is_loaded && asset_server.load_state(&cubemap.image_handle).is_loaded() {
-        let mut image = images.get_mut(&cubemap.image_handle).unwrap();
-        // NOTE: PNGs do not have any metadata that could indicate they contain a cubemap texture,
-        // so they appear as one texture. The following code reconfigures the texture as necessary.
-        if image.texture_descriptor.array_layer_count() == 1 {
-            let layer_count = image.height() / image.width();
-            let _ = image.reinterpret_stacked_2d_as_array(layer_count);
-            image.texture_view_descriptor = Some(TextureViewDescriptor {
-                dimension: Some(TextureViewDimension::Cube),
-                ..default()
-            });
-        }
-
-        for mut skybox in &mut skyboxes {
-            skybox.image = Some(cubemap.image_handle.clone());
-        }
-
-        cubemap.is_loaded = true;
     }
 }

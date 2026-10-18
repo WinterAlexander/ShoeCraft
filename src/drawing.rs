@@ -1,3 +1,4 @@
+use crate::shop::LeatherSheet;
 use crate::title_screen::GameState;
 use avian3d::parry::glamx::Vec3;
 use avian3d::prelude::{SpatialQuery, SpatialQueryFilter};
@@ -11,8 +12,9 @@ use bevy::math::Quat;
 use bevy::pbr::decal::{ForwardDecal, ForwardDecalMaterial, ForwardDecalMaterialExt};
 use bevy::pbr::{MeshMaterial3d, StandardMaterial};
 use bevy::prelude::{
-    Children, Commands, Component, Entity, GlobalTransform, IntoScheduleConfigs, MouseButton,
-    Query, Res, ResMut, Resource, Single, Touches, Transform, Window, With, default, in_state,
+    Children, Commands, Component, Entity, GlobalTransform, IntoScheduleConfigs, MouseButton, Name,
+    NextState, Query, Res, ResMut, Resource, Single, Touches, Transform, Window, With, Without,
+    default, in_state,
 };
 use bevy::window::PrimaryWindow;
 use std::f32::consts::PI;
@@ -22,12 +24,17 @@ pub struct DrawingPlugin;
 #[derive(Component)]
 pub struct Pencil {
     draw_normal: Vec3,
+    on_sheet: bool,
 }
+
+#[derive(Component)]
+pub struct ValidDrawing;
 
 impl Pencil {
     pub fn default() -> Self {
         Pencil {
             draw_normal: Vec3::ZERO,
+            on_sheet: false,
         }
     }
 }
@@ -37,7 +44,7 @@ impl Plugin for DrawingPlugin {
         app.add_systems(Startup, init_spray_material);
         app.add_systems(
             Update,
-            (draw, move_pencil).run_if(in_state(GameState::Drawing)),
+            (draw, move_pencil, handle_draw_end).run_if(in_state(GameState::Drawing)),
         );
     }
 }
@@ -74,6 +81,7 @@ fn move_pencil(
     camera_query: Single<(&Camera, &GlobalTransform)>,
     spatial_query: SpatialQuery,
     children: Query<&Children>,
+    names: Query<&Name>,
 ) {
     let position = if let Some(touch) = touches.iter().next() {
         touch.position()
@@ -105,6 +113,11 @@ fn move_pencil(
     pencil.1.translation = hit_point;
     pencil.1.rotation = Quat::from_axis_angle(Vec3::Z, PI * 5.0 / 4.0);
     pencil.2.draw_normal = hit.normal;
+    let name = names
+        .get(hit.entity)
+        .map(|n| n.as_str())
+        .unwrap_or("No name");
+    pencil.2.on_sheet = name.contains("Leather Sheet");
 }
 
 fn draw(
@@ -114,15 +127,34 @@ fn draw(
     pencil: Single<(&Transform, &Pencil)>,
 ) {
     if buttons.pressed(MouseButton::Left) {
-        let mut spray_transform = Transform::from_translation(pencil.0.translation)
+        let mut transform = Transform::from_translation(pencil.0.translation)
             .with_scale(Vec3::ONE * 0.03)
             .with_rotation(Quat::from_rotation_arc(Vec3::Y, pencil.1.draw_normal));
-        spray_transform.rotate_local_y(rand::random::<f32>() * PI * 2.0);
-
-        commands.spawn((
+        transform.rotate_local_y(rand::random::<f32>() * PI * 2.0);
+        let mut entity_commands = commands.spawn((
             ForwardDecal,
             MeshMaterial3d(spray_material.material.clone()),
-            spray_transform,
+            transform,
         ));
+
+        if pencil.1.on_sheet {
+            entity_commands.insert(ValidDrawing);
+        }
+    }
+}
+
+fn handle_draw_end(
+    mut commands: Commands,
+    buttons: Res<ButtonInput<MouseButton>>,
+    mut next_state: ResMut<NextState<GameState>>,
+    mut sheet_query: Single<&mut Transform, With<LeatherSheet>>,
+    mut drawing_query: Query<&mut Transform, (With<ValidDrawing>, Without<LeatherSheet>)>,
+) {
+    if buttons.just_pressed(MouseButton::Right) {
+        next_state.set(GameState::DrawingToCutting);
+        sheet_query.translation += Vec3::new(0.0, 0.6148, -0.6148);
+        for mut drawing_spot in drawing_query {
+            drawing_spot.translation += Vec3::new(0.0, 0.6148, -0.6148);
+        }
     }
 }
