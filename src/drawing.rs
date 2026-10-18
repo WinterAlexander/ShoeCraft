@@ -1,3 +1,5 @@
+use crate::camera_command::{CameraCommand, ControllableCamera};
+use crate::customer::CustomerCollider;
 use crate::shop::LeatherSheet;
 use crate::title_screen::GameState;
 use avian3d::parry::glamx::Vec3;
@@ -12,9 +14,9 @@ use bevy::math::Quat;
 use bevy::pbr::decal::{ForwardDecal, ForwardDecalMaterial, ForwardDecalMaterialExt};
 use bevy::pbr::{MeshMaterial3d, StandardMaterial};
 use bevy::prelude::{
-    Children, Commands, Component, Entity, GlobalTransform, IntoScheduleConfigs, MouseButton, Name,
-    NextState, Query, Res, ResMut, Resource, Single, Touches, Transform, Window, With, Without,
-    default, in_state,
+    Children, Commands, Component, EaseFunction, Entity, GlobalTransform, IntoScheduleConfigs,
+    MouseButton, Name, NextState, Query, Res, ResMut, Resource, Single, Touches, Transform, Window,
+    With, Without, default, in_state,
 };
 use bevy::window::PrimaryWindow;
 use std::f32::consts::PI;
@@ -25,16 +27,23 @@ pub struct DrawingPlugin;
 pub struct Pencil {
     draw_normal: Vec3,
     on_sheet: bool,
+    on_customer: bool,
 }
 
 #[derive(Component)]
 pub struct ValidDrawing;
+
+#[derive(Resource, Default)]
+pub struct DrawnOnCustomerTracker {
+    draw_count: i32,
+}
 
 impl Pencil {
     pub fn default() -> Self {
         Pencil {
             draw_normal: Vec3::ZERO,
             on_sheet: false,
+            on_customer: false,
         }
     }
 }
@@ -46,6 +55,7 @@ impl Plugin for DrawingPlugin {
             Update,
             (draw, move_pencil, handle_draw_end).run_if(in_state(GameState::Drawing)),
         );
+        app.insert_resource(DrawnOnCustomerTracker::default());
     }
 }
 
@@ -81,7 +91,8 @@ fn move_pencil(
     camera_query: Single<(&Camera, &GlobalTransform)>,
     spatial_query: SpatialQuery,
     children: Query<&Children>,
-    names: Query<&Name>,
+    sheet: Single<Entity, With<LeatherSheet>>,
+    customer: Single<Entity, (With<CustomerCollider>, Without<LeatherSheet>)>,
 ) {
     let position = if let Some(touch) = touches.iter().next() {
         touch.position()
@@ -113,11 +124,12 @@ fn move_pencil(
     pencil.1.translation = hit_point;
     pencil.1.rotation = Quat::from_axis_angle(Vec3::Z, PI * 5.0 / 4.0);
     pencil.2.draw_normal = hit.normal;
-    let name = names
-        .get(hit.entity)
-        .map(|n| n.as_str())
-        .unwrap_or("No name");
-    pencil.2.on_sheet = name.contains("Leather Sheet");
+    pencil.2.on_sheet =
+        hit.entity == *sheet || children.iter_descendants(*sheet).any(|e| e == hit.entity);
+    pencil.2.on_customer = hit.entity == *customer
+        || children
+            .iter_descendants(*customer)
+            .any(|e| e == hit.entity);
 }
 
 fn draw(
@@ -125,6 +137,8 @@ fn draw(
     buttons: Res<ButtonInput<MouseButton>>,
     spray_material: Res<SprayMaterial>,
     pencil: Single<(&Transform, &Pencil)>,
+    mut drawn_on_customer_tracker: ResMut<DrawnOnCustomerTracker>,
+    mut camera: Single<&mut ControllableCamera>,
 ) {
     if buttons.pressed(MouseButton::Left) {
         let mut transform = Transform::from_translation(pencil.0.translation)
@@ -139,6 +153,32 @@ fn draw(
 
         if pencil.1.on_sheet {
             entity_commands.insert(ValidDrawing);
+        }
+
+        if pencil.1.on_customer {
+            drawn_on_customer_tracker.draw_count += 1;
+            if drawn_on_customer_tracker.draw_count > 2 {
+                if camera.command_queue.len() == 0 {
+                    camera.command_queue.extend([
+                        CameraCommand::new_transition(
+                            Transform::from_xyz(-1.5, 1.0, -0.75)
+                                .looking_at(Vec3::new(-1.3, 1.0, -0.75), Vec3::Y),
+                            1.0,
+                            EaseFunction::SmoothStep,
+                        ),
+                        CameraCommand::Wait(1.0),
+                        CameraCommand::new_transition(
+                            Transform::from_xyz(-1.5, 1.0, -0.75)
+                                .looking_at(Vec3::new(-1.3, 0.0, -0.75), Vec3::Y),
+                            1.0,
+                            EaseFunction::SmoothStep,
+                        ),
+                    ]);
+                }
+                drawn_on_customer_tracker.draw_count = 0;
+            }
+        } else {
+            drawn_on_customer_tracker.draw_count = 0;
         }
     }
 }

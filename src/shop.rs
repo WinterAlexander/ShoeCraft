@@ -1,3 +1,4 @@
+use crate::camera_command::ControllableCamera;
 use crate::drawing::Pencil;
 use avian3d::PhysicsPlugins;
 use avian3d::prelude::{ColliderConstructor, ColliderConstructorHierarchy};
@@ -10,7 +11,6 @@ use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use bevy::render::camera::TemporalJitter;
 use bevy::world_serialization::WorldInstanceReady;
-use std::f32::consts::PI;
 
 pub struct ShopPlugin;
 
@@ -20,18 +20,13 @@ pub struct LeatherSheet;
 impl Plugin for ShopPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_shop);
-        app.add_systems(Update, (animation_transition));
         app.add_plugins(PhysicsPlugins::default())
             .insert_resource(ClearColor(Color::srgb(0.3, 0.6, 0.9)))
             .insert_resource(DirectionalLightShadowMap { size: 4096 });
     }
 }
 
-fn setup_shop(
-    mut commands: Commands,
-    mut assets: ResMut<AssetServer>,
-    mut graphs: ResMut<Assets<AnimationGraph>>,
-) {
+fn setup_shop(mut commands: Commands, assets: ResMut<AssetServer>) {
     commands.spawn((
         AudioPlayer::new(assets.load("test_song.ogg")),
         PlaybackSettings::LOOP,
@@ -72,6 +67,7 @@ fn setup_shop(
             clear_color: ClearColorConfig::Default,
             ..default()
         },
+        ControllableCamera::default(),
         Hdr,
         Projection::Perspective(PerspectiveProjection {
             fov: 55.0f32.to_radians(),
@@ -102,77 +98,6 @@ fn setup_shop(
             ColliderConstructorHierarchy::new(ColliderConstructor::ConvexDecompositionFromMesh),
         ))
         .observe(prepare_scene_children);
-
-    let mut graph = AnimationGraph::new();
-
-    let idle = graph.add_clip(
-        assets.load(GltfAssetLabel::Animation(0).from_asset("cat.glb")),
-        1.0,
-        graph.root,
-    );
-
-    let learn_forward = graph.add_clip(
-        assets.load(GltfAssetLabel::Animation(1).from_asset("cat.glb")),
-        1.0,
-        graph.root,
-    );
-
-    let start_lean_forward = graph.add_clip(
-        assets.load(GltfAssetLabel::Animation(2).from_asset("cat.glb")),
-        1.0,
-        graph.root,
-    );
-
-    let graph = graphs.add(graph);
-    commands
-        .spawn((
-            WorldAssetRoot(assets.load("cat.glb#Scene0")),
-            ColliderConstructorHierarchy::new(ColliderConstructor::ConvexDecompositionFromMesh),
-            Transform::from_xyz(-0.65, 0.0, -0.75).with_rotation(Quat::from_rotation_y(-PI / 2.0)),
-        ))
-        .observe(
-            move |ready: On<WorldInstanceReady>,
-                  mut commands: Commands,
-                  children: Query<&Children>,
-                  mut players: Query<&mut AnimationPlayer>| {
-                for child in children.iter_descendants(ready.entity) {
-                    if let Ok(mut player) = players.get_mut(child) {
-                        player.play(start_lean_forward);
-                        commands.entity(child).insert((
-                            AnimatedCustomer {
-                                idle,
-                                learn_forward,
-                                start_lean_forward,
-                            },
-                            AnimationGraphHandle(graph.clone()),
-                        ));
-                    }
-                }
-            },
-        )
-        .observe(prepare_scene_children);
-
-    commands.spawn((
-        WorldAssetRoot(assets.load("cat_leaning.glb#Scene0")),
-        ColliderConstructorHierarchy::new(ColliderConstructor::ConvexDecompositionFromMesh),
-        Transform::from_xyz(-0.65, 0.0, -0.75).with_rotation(Quat::from_rotation_y(-PI / 2.0)),
-        Visibility::Hidden,
-    ));
-}
-
-#[derive(Component)]
-pub struct AnimatedCustomer {
-    idle: AnimationNodeIndex,
-    learn_forward: AnimationNodeIndex,
-    start_lean_forward: AnimationNodeIndex,
-}
-
-fn animation_transition(query: Query<(&mut AnimationPlayer, &AnimatedCustomer)>) {
-    for (mut player, anims) in query {
-        if player.all_finished() {
-            player.play(anims.learn_forward).repeat();
-        }
-    }
 }
 
 fn prepare_scene_children(

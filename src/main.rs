@@ -1,3 +1,5 @@
+mod camera_command;
+mod customer;
 mod debug;
 mod debug_camera_controller;
 mod drawing;
@@ -8,6 +10,8 @@ mod title_screen;
 mod ui;
 mod window_management;
 
+use crate::camera_command::CameraCommandPlugin;
+use crate::customer::CustomerPlugin;
 use crate::debug::DebugPlugin;
 use crate::debug_camera_controller::DebugCameraControllerPlugin;
 use crate::drawing::DrawingPlugin;
@@ -68,9 +72,10 @@ fn main() {
             }),
     );
     app.add_plugins(InteractiveButtonPlugin);
+    app.add_plugins(CameraCommandPlugin);
     app.add_plugins((ShopPlugin, TitleScreenPlugin));
     app.add_plugins(DebugCameraControllerPlugin);
-    app.add_plugins(DrawingPlugin);
+    app.add_plugins((DrawingPlugin, CustomerPlugin));
     app.add_plugins((
         DebugPlugin,
         WindowManagementPlugin,
