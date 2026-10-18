@@ -55,7 +55,7 @@ fn setup_shop(mut commands: Commands, assets: ResMut<AssetServer>) {
         .build(),
     ));
 
-    commands.spawn((
+    let mut camera = commands.spawn((
         //NormalPrepass,
         //ShowPrepass::Normals,
         DepthPrepass,
@@ -87,10 +87,11 @@ fn setup_shop(mut commands: Commands, assets: ResMut<AssetServer>) {
             quality_level: ScreenSpaceAmbientOcclusionQualityLevel::Ultra,
             ..default()
         },
-        TemporalAntiAliasing::default(),
-        TemporalJitter::default(),
-        Bloom::default(),
     ));
+
+    if !cfg!(target_arch = "wasm32") {
+        camera.insert((TemporalAntiAliasing::default(), TemporalJitter::default()));
+    }
 
     commands
         .spawn((
