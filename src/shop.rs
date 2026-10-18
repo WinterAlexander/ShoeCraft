@@ -28,7 +28,7 @@ impl Plugin for ShopPlugin {
 
 fn setup_shop(mut commands: Commands, assets: ResMut<AssetServer>) {
     commands.spawn((
-        AudioPlayer::new(assets.load("test_song.ogg")),
+        AudioPlayer::new(assets.load("shoe_craft.ogg")),
         PlaybackSettings::LOOP,
     ));
 
