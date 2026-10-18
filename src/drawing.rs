@@ -148,7 +148,7 @@ fn handle_draw_end(
     buttons: Res<ButtonInput<MouseButton>>,
     mut next_state: ResMut<NextState<GameState>>,
     mut sheet_query: Single<&mut Transform, With<LeatherSheet>>,
-    mut drawing_query: Query<&mut Transform, (With<ValidDrawing>, Without<LeatherSheet>)>,
+    drawing_query: Query<&mut Transform, (With<ValidDrawing>, Without<LeatherSheet>)>,
 ) {
     if buttons.just_pressed(MouseButton::Right) {
         next_state.set(GameState::DrawingToCutting);

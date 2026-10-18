@@ -151,6 +151,13 @@ fn setup_shop(
             },
         )
         .observe(prepare_scene_children);
+
+    commands.spawn((
+        WorldAssetRoot(assets.load("cat_leaning.glb#Scene0")),
+        ColliderConstructorHierarchy::new(ColliderConstructor::ConvexDecompositionFromMesh),
+        Transform::from_xyz(-0.65, 0.0, -0.75).with_rotation(Quat::from_rotation_y(-PI / 2.0)),
+        Visibility::Hidden,
+    ));
 }
 
 #[derive(Component)]
@@ -160,7 +167,7 @@ pub struct AnimatedCustomer {
     start_lean_forward: AnimationNodeIndex,
 }
 
-fn animation_transition(mut query: Query<(&mut AnimationPlayer, &AnimatedCustomer)>) {
+fn animation_transition(query: Query<(&mut AnimationPlayer, &AnimatedCustomer)>) {
     for (mut player, anims) in query {
         if player.all_finished() {
             player.play(anims.learn_forward).repeat();
