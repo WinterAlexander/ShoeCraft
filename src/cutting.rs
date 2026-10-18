@@ -1,6 +1,6 @@
 use crate::shop::LeatherSheet;
 use crate::title_screen::GameState;
-use avian3d::parry::glamx::{Quat, Vec3};
+use avian3d::parry::glamx::{Quat, Vec2Swizzles, Vec3};
 use avian3d::prelude::{SpatialQuery, SpatialQueryFilter};
 use bevy::app::{App, Plugin, Update};
 use bevy::asset::{Assets, Handle, RenderAssetUsages};
@@ -13,7 +13,7 @@ use bevy::mesh::{Indices, Mesh, Mesh3d, PrimitiveTopology};
 use bevy::pbr::{MeshMaterial3d, StandardMaterial};
 use bevy::prelude::{
     Children, Commands, Component, Entity, GlobalTransform, InfinitePlane3d, IntoScheduleConfigs,
-    MouseButton, Query, Res, ResMut, Single, Time, Touches, Transform, Window, With, Without,
+    MouseButton, Name, Query, Res, ResMut, Single, Touches, Transform, Window, With, Without,
     default, in_state,
 };
 use bevy::window::PrimaryWindow;
@@ -21,8 +21,9 @@ use std::f32::consts::PI;
 
 const TABLE_HEIGHT: f32 = 0.617;
 const MAX_CUT_DISTANCE: f32 = 0.135;
-pub const CUT_PRISM_BASE: i32 = 4;
-pub const CUT_THICKNESS: f32 = 0.01;
+const CUT_PRISM_BASE: i32 = 4;
+const CUT_THICKNESS: f32 = 0.01;
+const SHEET_HEIGHT: f32 = 0.02;
 
 pub struct KnifePlugin;
 
@@ -34,8 +35,10 @@ impl Plugin for KnifePlugin {
                 .run_if(in_state(GameState::Cutting)),
         );
 
-        app.add_systems(Update, clear_cuts);
-        app.add_systems(Update, render_cuts.after(clear_cuts));
+        app.add_systems(
+            Update,
+            (clear_cuts, render_cuts.after(clear_cuts)).run_if(in_state(GameState::Cutting)),
+        );
     }
 }
 
@@ -45,6 +48,7 @@ pub struct Knife {
     pressed: bool,
     first_click: bool,
     angle: f32,
+    on_sheet: bool,
 }
 
 pub struct Cut {
@@ -72,6 +76,7 @@ impl Default for Knife {
             pressed: false,
             first_click: true,
             angle: 0.0,
+            on_sheet: false,
         }
     }
 }
@@ -128,6 +133,7 @@ fn move_knife(
     camera_query: Single<(&Camera, &GlobalTransform)>,
     spatial_query: SpatialQuery,
     children: Query<&Children>,
+    mut sheet: Single<(Entity, &mut Cuttable), (With<LeatherSheet>, Without<Knife>)>,
 ) {
     if !knife.2.in_hand {
         return;
@@ -158,12 +164,19 @@ fn move_knife(
         let offset = knife.1.translation.xz() - hit_point.xz();
         let angle = knife.2.angle;
         let direction_of_interest = Vec2::from_angle(angle);
-        let offset = -offset.dot(direction_of_interest) * 2.0;
+        let offset = -(offset.dot(direction_of_interest) * 2.0).clamp(-PI / 5.0, PI / 5.0);
 
         knife.1.rotation = Quat::default();
         knife.1.rotate_local_x(PI);
         knife.1.rotate_local_y(angle);
-        knife.1.rotate_local_z(offset.clamp(-PI / 5.0, PI / 5.0));
+        knife.1.rotate_local_z(offset);
+
+        let progress = offset / (PI / 5.0);
+        let Some(cut) = sheet.1.cuts.last_mut() else {
+            return;
+        };
+        cut.size_positive = cut.size_positive.max(progress * MAX_CUT_DISTANCE);
+        cut.size_negative = cut.size_negative.max(-progress * MAX_CUT_DISTANCE);
         return;
     } else {
         let Some(hit) = spatial_query.cast_ray_predicate(
@@ -187,6 +200,8 @@ fn move_knife(
         knife.1.rotate_local_x(PI);
         let angle = knife.2.angle;
         knife.1.rotate_local_y(angle);
+        knife.2.on_sheet =
+            hit.entity == sheet.0 || children.iter_descendants(sheet.0).any(|e| e == hit.entity);
     }
 }
 
@@ -216,13 +231,13 @@ fn use_knife(
 
     knife.2.pressed = buttons.pressed(MouseButton::Left);
 
-    if knife.2.pressed {
+    if knife.2.pressed && knife.2.on_sheet {
         let center = (knife.1.translation - sheet.1.translation).xz();
         sheet.0.cuts.push(Cut {
             center,
             angle: knife.2.angle,
-            size_positive: MAX_CUT_DISTANCE,
-            size_negative: MAX_CUT_DISTANCE,
+            size_positive: 0.0,
+            size_negative: 0.0,
         });
     }
 }
@@ -231,19 +246,19 @@ pub fn clear_cuts(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    web_render_segments_query: Query<(Entity, &CutRenderMesh)>,
+    cut_render_query: Query<(Entity, &CutRenderMesh)>,
 ) {
     for (
-        web_render_segment_entity,
+        entity,
         CutRenderMesh {
-            mesh_handle: web_segment_mesh_handle,
-            material_handle: web_segment_material_handle,
+            mesh_handle: cut_mesh_handle,
+            material_handle: cut_material_handle,
         },
-    ) in web_render_segments_query.iter()
+    ) in cut_render_query.iter()
     {
-        meshes.remove(web_segment_mesh_handle);
-        materials.remove(web_segment_material_handle);
-        commands.entity(web_render_segment_entity).despawn();
+        meshes.remove(cut_mesh_handle);
+        materials.remove(cut_material_handle);
+        commands.entity(entity).despawn();
     }
 }
 
@@ -253,12 +268,16 @@ pub fn render_cuts(
     mut materials: ResMut<Assets<StandardMaterial>>,
     sheet_query: Single<(&Cuttable, &Transform)>,
 ) {
-    let mesh = create_web_mesh(&sheet_query.0, &sheet_query.1);
+    if sheet_query.0.cuts.len() == 0 {
+        return;
+    }
+
+    let mesh = create_cut_mesh(&sheet_query.0, &sheet_query.1);
     let mesh_handle: Handle<Mesh> = meshes.add(mesh);
 
     let material_handle: Handle<StandardMaterial> = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.8, 0.8, 0.8),
-        // unlit: true,
+        base_color: Color::BLACK,
+        unlit: true,
         ..default()
     });
 
@@ -272,7 +291,7 @@ pub fn render_cuts(
     ));
 }
 
-fn create_web_mesh(cuts: &Cuttable, sheet_transform: &Transform) -> Mesh {
+fn create_cut_mesh(cuts: &Cuttable, sheet_transform: &Transform) -> Mesh {
     let mut positions: Vec<Vec3> = Vec::new();
     let mut normals: Vec<Vec3> = Vec::new();
     let mut uvs: Vec<Vec2> = Vec::new();
@@ -281,60 +300,55 @@ fn create_web_mesh(cuts: &Cuttable, sheet_transform: &Transform) -> Mesh {
 
     for cut in &cuts.cuts {
         let first_position = sheet_transform.translation
-            + (cut.center + Vec2::from_angle(cut.angle) * cut.size_positive).extend(0.0);
+            + Vec3::Y * SHEET_HEIGHT
+            + (cut.center + Vec2::from_angle(cut.angle) * cut.size_positive)
+                .xxy()
+                .with_y(0.0);
         let second_position = sheet_transform.translation
-            + (cut.center - Vec2::from_angle(cut.angle) * cut.size_negative).extend(0.0);
+            + Vec3::Y * SHEET_HEIGHT
+            + (cut.center - Vec2::from_angle(cut.angle) * cut.size_negative)
+                .xxy()
+                .with_y(0.0);
 
         let segment_as_vec = second_position - first_position;
 
-        for i in 0..CUT_PRISM_BASE {
-            let quat = Quat::from_axis_angle(
-                segment_as_vec.normalize(),
-                i as f32 / CUT_PRISM_BASE as f32 * 2.0 * PI,
-            );
-            let normal = quat.mul_vec3(Vec3::new(0.0, 0.0, 1.0));
+        let to_camera = Vec3::Y;
+        let perp = segment_as_vec.cross(to_camera).normalize();
+        let top_left = first_position + perp * CUT_THICKNESS / 2.0;
+        let top_right = first_position - perp * CUT_THICKNESS / 2.0;
 
-            let top_left_index = positions.len();
-            let top_right_index = top_left_index + 1;
-            let bottom_left_index = top_left_index + 2;
-            let bottom_right_index = top_left_index + 3;
+        let bottom_left = second_position + perp * CUT_THICKNESS / 2.0;
+        let bottom_right = second_position - perp * CUT_THICKNESS / 2.0;
 
-            let perp = segment_as_vec.cross(normal).normalize();
-            let top_left =
-                first_position + perp * CUT_THICKNESS / 2.0 + normal * CUT_THICKNESS / 2.0;
-            let top_right =
-                first_position - perp * CUT_THICKNESS / 2.0 + normal * CUT_THICKNESS / 2.0;
+        let top_left_index = positions.len();
+        let top_right_index = top_left_index + 1;
+        let bottom_left_index = top_left_index + 2;
+        let bottom_right_index = top_left_index + 3;
 
-            let bottom_left =
-                second_position + perp * CUT_THICKNESS / 2.0 + normal * CUT_THICKNESS / 2.0;
-            let bottom_right =
-                second_position - perp * CUT_THICKNESS / 2.0 + normal * CUT_THICKNESS / 2.0;
+        positions.push(top_left);
+        positions.push(top_right);
+        positions.push(bottom_left);
+        positions.push(bottom_right);
 
-            positions.push(top_left);
-            positions.push(top_right);
-            positions.push(bottom_left);
-            positions.push(bottom_right);
+        normals.push(to_camera);
+        normals.push(to_camera);
+        normals.push(to_camera);
+        normals.push(to_camera);
 
-            normals.push(normal);
-            normals.push(normal);
-            normals.push(normal);
-            normals.push(normal);
+        uvs.push(Vec2::new(0.0, 0.0));
+        uvs.push(Vec2::new(1.0, 0.0));
+        uvs.push(Vec2::new(0.0, 1.0));
+        uvs.push(Vec2::new(1.0, 1.0));
 
-            uvs.push(Vec2::new(0.0, 0.0));
-            uvs.push(Vec2::new(1.0, 0.0));
-            uvs.push(Vec2::new(0.0, 1.0));
-            uvs.push(Vec2::new(1.0, 1.0));
+        // triangle 1
+        indices.push(bottom_left_index.try_into().unwrap());
+        indices.push(top_right_index.try_into().unwrap());
+        indices.push(top_left_index.try_into().unwrap());
 
-            // triangle 1
-            indices.push(bottom_left_index.try_into().unwrap());
-            indices.push(top_right_index.try_into().unwrap());
-            indices.push(top_left_index.try_into().unwrap());
-
-            // triangle 2
-            indices.push(bottom_left_index.try_into().unwrap());
-            indices.push(bottom_right_index.try_into().unwrap());
-            indices.push(top_right_index.try_into().unwrap());
-        }
+        // triangle 2
+        indices.push(bottom_left_index.try_into().unwrap());
+        indices.push(bottom_right_index.try_into().unwrap());
+        indices.push(top_right_index.try_into().unwrap());
     }
 
     let mesh = Mesh::new(
