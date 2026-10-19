@@ -226,6 +226,8 @@ fn keep_drawings_on_sheet(
 }
 
 fn drawing_done_handler(
+    decal_material_query: Query<&MeshMaterial3d<ForwardDecalMaterial<StandardMaterial>>>,
+    mut decal_materials: ResMut<Assets<ForwardDecalMaterial<StandardMaterial>>>,
     input: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameState>>,
     mut pencil: Single<&mut Pencil>,
@@ -237,6 +239,13 @@ fn drawing_done_handler(
 ) {
     if input.just_pressed(KeyCode::Enter) {
         next_state.set(GameState::Cutting);
+
+        for material_handle in &decal_material_query {
+            if let Some(mut material) = decal_materials.get_mut(&material_handle.0) {
+                material.extension.depth_fade_factor = 0.0001; // so they don't render on top of cuts
+            }
+        }
+
         pencil.in_hand = false;
         let (sheet_transform, sheet_commands) = (sheet_query.0, &mut sheet_query.1);
         let (cam_transform, cam_commands) = (camera_query.0, &mut camera_query.1);

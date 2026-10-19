@@ -24,7 +24,7 @@ use std::f32::consts::PI;
 
 const TABLE_HEIGHT: f32 = 0.617;
 const MAX_CUT_DISTANCE: f32 = 0.135;
-const CUT_THICKNESS: f32 = 0.01;
+const CUT_THICKNESS: f32 = 0.002;
 const SHEET_HEIGHT: f32 = 0.02;
 
 pub struct KnifePlugin;
@@ -253,7 +253,7 @@ fn rotate_knife(mut knife: Single<&mut Knife>, mouse_scroll: Res<AccumulatedMous
     if !knife.in_hand || knife.pressed {
         return;
     }
-    knife.angle += mouse_scroll.delta.y * PI / 8.0;
+    knife.angle += mouse_scroll.delta.y * PI / 32.0;
 }
 
 fn use_knife(
