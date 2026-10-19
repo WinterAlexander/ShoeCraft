@@ -1,2 +1,2 @@
-mod hint;
+pub mod hint;
 pub mod interactive_button;

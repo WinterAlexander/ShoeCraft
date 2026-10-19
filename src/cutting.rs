@@ -27,9 +27,9 @@ const MAX_CUT_DISTANCE: f32 = 0.135;
 const CUT_THICKNESS: f32 = 0.002;
 const SHEET_HEIGHT: f32 = 0.02;
 
-pub struct KnifePlugin;
+pub struct CuttingPlugin;
 
-impl Plugin for KnifePlugin {
+impl Plugin for CuttingPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
@@ -64,7 +64,8 @@ pub struct Knife {
 
 #[derive(Component)]
 pub struct Sole {
-    left: bool,
+    pub left: bool,
+    pub polygon: Vec<Vec2>,
 }
 
 pub struct Cut {
@@ -599,7 +600,7 @@ fn triangulate(polygon: &[Vec2]) -> Option<Vec<[u32; 3]>> {
     Some(triangles)
 }
 
-fn create_extrusion_mesh(polygon: &[Vec2], depth: f32) -> Option<Mesh> {
+pub(crate) fn create_extrusion_mesh(polygon: &[Vec2], depth: f32) -> Option<Mesh> {
     let half_depth = depth / 2.0;
     let cap_triangles = triangulate(polygon)?;
 
@@ -713,7 +714,10 @@ fn cut_leather_sheet(
                 Mesh3d(mesh.clone()),
                 MeshMaterial3d(material_handle.clone()),
                 transform,
-                Sole { left: true },
+                Sole {
+                    left: true,
+                    polygon: polygon.to_vec(),
+                },
                 CommandSupport {
                     command_queue: VecDeque::from([Command::new_transition(
                         left_destination,
@@ -732,7 +736,10 @@ fn cut_leather_sheet(
                 Mesh3d(mesh),
                 MeshMaterial3d(material_handle),
                 transform,
-                Sole { left: false },
+                Sole {
+                    left: false,
+                    polygon,
+                },
                 CommandSupport {
                     command_queue: VecDeque::from([Command::new_transition(
                         right_destination,

@@ -1,3 +1,4 @@
+mod assembly;
 mod command;
 mod customer;
 mod cutting;
@@ -11,15 +12,17 @@ mod title_screen;
 mod ui;
 mod window_management;
 
+use crate::assembly::AssemblyPlugin;
 use crate::command::CommandPlugin;
 use crate::customer::CustomerPlugin;
-use crate::cutting::KnifePlugin;
+use crate::cutting::CuttingPlugin;
 use crate::debug::DebugPlugin;
 use crate::debug_camera_controller::DebugCameraControllerPlugin;
 use crate::drawing::DrawingPlugin;
 use crate::pause::PausePlugin;
 use crate::shop::ShopPlugin;
 use crate::title_screen::{GameState, TitleScreenPlugin};
+use crate::ui::hint::HintPlugin;
 use crate::ui::interactive_button::InteractiveButtonPlugin;
 use crate::window_management::WindowManagementPlugin;
 use bevy::DefaultPlugins;
@@ -52,7 +55,7 @@ fn main() {
             .set(WindowPlugin {
                 primary_window: Some(Window {
                     fit_canvas_to_parent: true,
-                    title: "Bevy Quickstart Game".to_string(),
+                    title: "ShoeCraft".to_string(),
                     ..default()
                 }),
                 primary_cursor_options: Some(CursorOptions {
@@ -75,11 +78,10 @@ fn main() {
     );
     app.add_plugins(InteractiveButtonPlugin);
     app.add_plugins(CommandPlugin);
-    app.add_plugins((ShopPlugin, TitleScreenPlugin));
+    app.add_plugins((ShopPlugin, TitleScreenPlugin, HintPlugin));
     app.add_plugins(DebugCameraControllerPlugin);
-    app.add_plugins(DrawingPlugin);
     app.add_plugins(CustomerPlugin);
-    app.add_plugins(KnifePlugin);
+    app.add_plugins((DrawingPlugin, CuttingPlugin, AssemblyPlugin));
     app.add_plugins((
         DebugPlugin,
         WindowManagementPlugin,
