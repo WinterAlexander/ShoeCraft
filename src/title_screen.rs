@@ -104,7 +104,7 @@ fn on_enter(mut commands: Commands, asset_server: Res<AssetServer>) {
             align_content: AlignContent::Center,
             ..default()
         },
-        ImageNode::new(asset_server.load("quickstart_logo.png")),
+        ImageNode::new(asset_server.load("logo.png")),
     ));
 }
 

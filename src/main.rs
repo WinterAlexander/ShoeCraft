@@ -86,9 +86,9 @@ fn main() {
         DebugPlugin,
         WindowManagementPlugin,
         PausePlugin,
-        ShowPrepassPlugin,
-        EguiPlugin::default(),
-        WorldInspectorPlugin::new(),
+        //ShowPrepassPlugin,
+        //EguiPlugin::default(),
+        //WorldInspectorPlugin::new(),
     ));
     app.insert_state(GameState::TitleScreen);
 
