@@ -10,6 +10,7 @@ use bevy::prelude::{
     Commands, Component, IntoScheduleConfigs, OnEnter, Query, Res, ResMut, Transform, default,
     in_state,
 };
+use std::f32::consts::PI;
 
 /// Scale applied to the bottom end of the prism (its -Z end).
 const BOTTOM_SCALE: f32 = 0.9;
@@ -42,7 +43,7 @@ fn spawn_covers(
     }
 
     for (sole, transform, cmd) in soles {
-        if cmd.command_queue.len() > 0 || sole.left {
+        if cmd.command_queue.len() > 0 || !sole.left {
             continue;
         }
 
@@ -68,15 +69,6 @@ fn spawn_covers(
     }
 }
 
-/// Tapers the extruded prism into a shoe: the two ends along Z are scaled about
-/// the shape's centre by their own factor and the top end leans toward the
-/// world's -Z direction by `TOP_Z_OFFSET`.
-///
-/// The prism ends sit at ±depth/2, so the sign of a vertex's Z tells which end
-/// it belongs to. Scaling both the caps and the end rings of the side walls
-/// keeps the prism closed. The entity's rotation converts the world -Z lean
-/// into this mesh's local axes, because the sole rotation chain orients the
-/// extrusion axis (local Z) along world X rather than straight out of the table.
 fn shape_shoe(mesh: &mut Mesh, transform: &Transform) {
     let Some(VertexAttributeValues::Float32x3(positions)) =
         mesh.attribute_mut(Mesh::ATTRIBUTE_POSITION)
@@ -110,8 +102,6 @@ mod tests {
     use super::*;
     use std::f32::consts::PI;
 
-    /// The world -Z lean converts to the mesh's local -Y for the sole rotation
-    /// chain (rotate_z then rotate_y by 90 degrees).
     fn sole_rotation() -> Transform {
         let mut transform = Transform::IDENTITY;
         transform.rotate_z(PI / 2.0);
