@@ -28,7 +28,7 @@ impl Plugin for ShopPlugin {
 
 fn setup_shop(mut commands: Commands, assets: ResMut<AssetServer>) {
     commands.spawn((
-        AudioPlayer::new(assets.load("shoe_craft.ogg")),
+        AudioPlayer::new(assets.load("calm_foot.ogg")),
         PlaybackSettings::LOOP,
     ));
 
@@ -114,7 +114,9 @@ fn prepare_scene_children(
                     commands.entity(child).insert(Pencil::default());
                 }
                 "Knife" => {
-                    commands.entity(child).insert(Knife::default());
+                    commands
+                        .entity(child)
+                        .insert((Knife::default(), CommandSupport::default()));
                 }
                 "Leather Sheet" => {
                     commands.entity(child).insert((

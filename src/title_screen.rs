@@ -15,6 +15,7 @@ pub enum GameState {
     TitleScreen,
     Drawing,
     Cutting,
+    Assembly,
     Paused,
 }
 

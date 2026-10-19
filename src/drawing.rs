@@ -16,8 +16,8 @@ use bevy::pbr::decal::{ForwardDecal, ForwardDecalMaterial, ForwardDecalMaterialE
 use bevy::pbr::{MeshMaterial3d, StandardMaterial};
 use bevy::prelude::{
     Children, Commands, Component, EaseFunction, Entity, GlobalTransform, IntoScheduleConfigs,
-    MouseButton, NextState, Query, Res, ResMut, Resource, Single, Touches, Transform, Window, With,
-    Without, default, in_state,
+    KeyCode, MouseButton, NextState, Query, Res, ResMut, Resource, Single, Touches, Transform,
+    Window, With, Without, default, in_state,
 };
 use bevy::window::PrimaryWindow;
 use std::f32::consts::PI;
@@ -226,7 +226,7 @@ fn keep_drawings_on_sheet(
 }
 
 fn drawing_done_handler(
-    buttons: Res<ButtonInput<MouseButton>>,
+    input: Res<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<GameState>>,
     mut pencil: Single<&mut Pencil>,
     mut sheet_query: Single<(&Transform, &mut CommandSupport), With<LeatherSheet>>,
@@ -235,7 +235,7 @@ fn drawing_done_handler(
         (With<Camera3d>, Without<LeatherSheet>),
     >,
 ) {
-    if buttons.just_pressed(MouseButton::Right) {
+    if input.just_pressed(KeyCode::Enter) {
         next_state.set(GameState::Cutting);
         pencil.in_hand = false;
         let (sheet_transform, sheet_commands) = (sheet_query.0, &mut sheet_query.1);
